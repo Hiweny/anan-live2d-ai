@@ -51,7 +51,7 @@
     const w = bubbleEl.offsetWidth || 240;
     const pad = 14;
     let x = Math.max(w / 2 + pad, Math.min(window.innerWidth - w / 2 - pad, a.x));
-    let y = Math.max(86, a.y - 4);
+    let y = Math.max(84, a.y);
     bubbleEl.style.left = x + "px";
     bubbleEl.style.top = y + "px";
   }

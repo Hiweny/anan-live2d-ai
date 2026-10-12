@@ -173,10 +173,10 @@
     const H = this.app.renderer.height / this.app.renderer.resolution;
     const oh = m.internalModel.originalHeight || 1;
     const s = this._userScale || 1;
-    const base = (H * 0.80) / oh;
+    const base = (H * 0.76) / oh;
     m.scale.set(base * s);
     m.x = W * (0.5 + (this._userX || 0) * 0.32);
-    m.y = H * (0.94 + (this._userY || 0) * 0.16);
+    m.y = H * (0.96 + (this._userY || 0) * 0.16);
   };
 
   Live2D.prototype.setTransform = function (opts) {
@@ -233,7 +233,7 @@
     // 头部约在可见包围盒上方 12% 处、水平略偏
     return {
       x: b.x + b.width * 0.5,
-      y: b.y + b.height * 0.10
+      y: b.y + 4
     };
   };
 
