@@ -41,12 +41,15 @@ try {
   await page.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForFunction(() => window.AnAn && window.AnAn.__ready === true, { timeout: 150000 });
   diag.steps.push("model-ready");
+  await page.evaluate(() => { const s = document.getElementById("settings"); if (s) s.hidden = true; });
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${tag}-01-loaded.png` });
 
   diag.paramCount = await page.evaluate(() => {
     try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; }
   });
+  diag.paramError = await page.evaluate(() => window.__anan.live2d.paramError || null);
+  diag.hasAngleX = await page.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamAngleX") !== -1; } catch (e) { return null; } });
   diag.expressions = await page.evaluate(() => {
     try {
       const em = window.__anan.live2d.model.internalModel.motionManager.expressionManager;

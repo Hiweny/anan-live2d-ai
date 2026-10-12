@@ -87,16 +87,22 @@
     const im = model.internalModel;
     this.coreModel = im.coreModel;
 
-    // 4) 收集参数表
+    // 4) 收集参数表（用于调试 / 展示）
+    this._params = [];
     try {
       const cm = this.coreModel;
-      const n = cm.getParameterCount();
+      const n = (typeof cm.getParameterCount === "function") ? cm.getParameterCount() : 0;
       for (let i = 0; i < n; i++) {
-        const id = cm.getParameterId(i);
+        let id = cm.getParameterId(i);
+        if (id && typeof id.getString === "function") id = id.getString();
+        id = String(id);
         this._params.push(id);
-        this._paramIndex[id] = i;
       }
-    } catch (e) { AnAn.log("参数表收集失败", e); }
+      AnAn.log("参数数量", n);
+    } catch (e) {
+      this.paramError = String((e && e.message) || e);
+      AnAn.log("参数表收集失败", e);
+    }
 
     // 5) 调温柔和的呼吸参数
     try {
@@ -131,10 +137,15 @@
 
     // 7) 动作引擎挂到 beforeModelUpdate
     const host = {
-      hasParam: function (id) { return self._paramIndex[id] !== undefined; },
+      hasParam: function (id) {
+        try { return self.coreModel.getParameterIndex(id) !== -1; } catch (e) { return false; }
+      },
       range: function (id) {
-        const i = self._paramIndex[id]; if (i === undefined) return [0, 1];
-        return [self.coreModel.getParameterMinimumValue(i), self.coreModel.getParameterMaximumValue(i)];
+        try {
+          const i = self.coreModel.getParameterIndex(id);
+          if (i < 0) return [0, 1];
+          return [self.coreModel.getParameterMinimumValue(i), self.coreModel.getParameterMaximumValue(i)];
+        } catch (e) { return [0, 1]; }
       },
       applyAdd: function (id, d) { try { self.coreModel.addParameterValueById(id, d, 1); } catch (e) {} },
       applySet: function (id, v, w) { try { self.coreModel.setParameterValueById(id, v, w == null ? 1 : w); } catch (e) {} }
