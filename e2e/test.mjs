@@ -16,7 +16,8 @@ const browser = await chromium.launch({
     "--enable-unsafe-swiftshader",
     "--use-gl=angle",
     "--use-angle=swiftshader",
-    "--ignore-gpu-blocklist"
+    "--ignore-gpu-blocklist",
+    "--autoplay-policy=no-user-gesture-required"
   ]
 });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1, locale: "zh-CN" });
@@ -84,6 +85,16 @@ try {
   await page.waitForTimeout(450);
   diag.applied_tilt = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
   await shot("04-gesture-tilt");
+
+  // 语音：验证 Edge TTS（微软免费接口）在浏览器内是否可用（含回退）
+  diag.tts = await page.evaluate(async () => {
+    try {
+      const t = window.__anan.tts;
+      t.resume();
+      const r = await t.speak("你好呀，我是安An。", { engine: "edge", edgeVoice: "zh-CN-XiaoxiaoNeural", rate: 1, pitch: 1, volume: 0.0 });
+      return { engine: r && r.engine, last: t.lastEngine };
+    } catch (e) { return { error: String((e && e.message) || e) }; }
+  });
 
   // AI 对话（真实接口）
   if (K && M) {
