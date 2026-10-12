@@ -1,0 +1,45 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "AnAn.moc3",
+		"Textures": [
+			"textures/texture_00.png",
+			"textures/texture_01.png",
+			"textures/texture_02.png"
+		],
+		"Physics": "AnAn.physics3.json",
+		"Expressions": [
+			{ "Name": "exp1", "File": "expressions/exp1.exp3.json" },
+			{ "Name": "down", "File": "expressions/down.exp3.json" },
+			{ "Name": "abb", "File": "expressions/abb.exp3.json" },
+			{ "Name": "angry", "File": "expressions/angry.exp3.json" },
+			{ "Name": "think", "File": "expressions/think.exp3.json" },
+			{ "Name": "writenote", "File": "expressions/writenote.exp3.json" },
+			{ "Name": "note", "File": "expressions/note.exp3.json" },
+			{ "Name": "notebig", "File": "expressions/notebig.exp3.json" },
+			{ "Name": "notelily", "File": "expressions/notelily.exp3.json" },
+			{ "Name": "armLup", "File": "expressions/armLup.exp3.json" },
+			{ "Name": "armL06", "File": "expressions/armL06.exp3.json" },
+			{ "Name": "shy", "File": "expressions/shy.exp3.json" },
+			{ "Name": "shy2", "File": "expressions/shy2.exp3.json" },
+			{ "Name": "sur1", "File": "expressions/sur1.exp3.json" },
+			{ "Name": "sweat", "File": "expressions/sweat.exp3.json" },
+			{ "Name": "namida", "File": "expressions/namida.exp3.json" },
+			{ "Name": "pale01", "File": "expressions/pale01.exp3.json" },
+			{ "Name": "pale02", "File": "expressions/pale02.exp3.json" }
+		]
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [ "ParamEyeLOpen", "ParamEyeROpen" ]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [ "ParamMouthOpenY" ]
+		}
+	],
+	"HitAreas": []
+}
