@@ -51,7 +51,7 @@
     const w = bubbleEl.offsetWidth || 240;
     const pad = 14;
     let x = Math.max(w / 2 + pad, Math.min(window.innerWidth - w / 2 - pad, a.x));
-    let y = Math.max(74, a.y);
+    let y = Math.max(86, a.y - 4);
     bubbleEl.style.left = x + "px";
     bubbleEl.style.top = y + "px";
   }
@@ -204,6 +204,7 @@
         stream: S.stream,
         onReasoning: function (d, full) {
           reasoningBuf = full;
+          state.lastReasoning = full;
           if (S.showReasoning && !gotContent) {
             setBubble("thinking", { thinking: false, text: "💭 " + full });
             setStatus("思考中…", "thinking");

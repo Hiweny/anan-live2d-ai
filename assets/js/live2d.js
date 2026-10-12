@@ -173,10 +173,10 @@
     const H = this.app.renderer.height / this.app.renderer.resolution;
     const oh = m.internalModel.originalHeight || 1;
     const s = this._userScale || 1;
-    const base = (H * 1.12) / oh;
+    const base = (H * 0.80) / oh;
     m.scale.set(base * s);
     m.x = W * (0.5 + (this._userX || 0) * 0.32);
-    m.y = H * (0.995 + (this._userY || 0) * 0.16);
+    m.y = H * (0.94 + (this._userY || 0) * 0.16);
   };
 
   Live2D.prototype.setTransform = function (opts) {

@@ -91,6 +91,7 @@ try {
     diag.bubbleText = await page.evaluate(() => { const t = document.querySelector('#bubble [data-role="text"]'); return t && t.textContent; });
     diag.mood = await page.evaluate(() => window.__anan.mood);
     diag.historyLen = await page.evaluate(() => window.__anan.history.length);
+    diag.lastReasoning = await page.evaluate(() => (window.__anan.lastReasoning || "").slice(0, 120));
   }
 } catch (e) {
   diag.fatal = String((e && e.stack) || e);
