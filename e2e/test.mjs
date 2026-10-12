@@ -38,6 +38,8 @@ if (K) {
   }, [K, B, M]);
 }
 
+const clickEval = async (sel) => page.evaluate((s) => { const el = document.querySelector(s); if (el) el.click(); }, sel);
+
 try {
   await page.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.waitForFunction(() => window.AnAn && window.AnAn.__ready === true, { timeout: 150000 });
@@ -46,9 +48,7 @@ try {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${tag}-01-loaded.png` });
 
-  diag.paramCount = await page.evaluate(() => {
-    try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; }
-  });
+  diag.paramCount = await page.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
   diag.paramError = await page.evaluate(() => window.__anan.live2d.paramError || null);
   diag.hasAngleX = await page.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamAngleX") !== -1; } catch (e) { return null; } });
   diag.expressions = await page.evaluate(() => {
@@ -59,35 +59,34 @@ try {
     } catch (e) { return null; }
   });
 
-  // 开始（解锁音频）
-  await page.click("#guardBtn").catch(() => {});
-  await page.waitForTimeout(900);
+  // 开始（解锁音频）—— 用 evaluate 点击，规避呼吸动画导致的稳定性检测
+  await clickEval("#guardBtn");
+  await page.waitForTimeout(1000);
+  diag.guardHidden = await page.evaluate(() => document.getElementById("guard").hidden);
   await page.screenshot({ path: `${outDir}/${tag}-02-started.png` });
 
-  // 触发动作并截图
+  // 触发动作并截图，读取“上一帧实际叠加量”作为数值证据
   await page.evaluate(() => window.__ananPlay("look_away"));
-  await page.waitForTimeout(500);
-  const a1 = await page.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterValueById("ParamAngleX"); } catch (e) { return null; } });
+  await page.waitForTimeout(600);
+  diag.applied_lookaway = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
   await page.screenshot({ path: `${outDir}/${tag}-03-gesture-lookaway.png` });
 
   await page.evaluate(() => window.__ananPlay("tilt"));
-  await page.waitForTimeout(350);
-  const a2 = await page.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterValueById("ParamAngleZ"); } catch (e) { return null; } });
+  await page.waitForTimeout(450);
+  diag.applied_tilt = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
   await page.screenshot({ path: `${outDir}/${tag}-04-gesture-tilt.png` });
-  diag.paramAngleX_duringGesture = a1;
-  diag.paramAngleZ_duringGesture = a2;
 
   // AI 对话（真实接口）
   if (K && M) {
     await page.fill("#chatInput", "你好，用一句话介绍自己，并在开头用动作标签表现出你很开心");
-    await page.click("#btnSend");
+    await clickEval("#btnSend");
     await page.waitForFunction(() => {
       const b = document.getElementById("bubble");
       if (!b || b.dataset.state !== "show") return false;
       const t = b.querySelector('[data-role="text"]');
       return b.dataset.kind === "reply" && t && (t.textContent || "").length > 0;
     }, { timeout: 120000 }).catch(() => diag.steps.push("chat-timeout"));
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: `${outDir}/${tag}-05-chat.png` });
     diag.bubbleText = await page.evaluate(() => { const t = document.querySelector('#bubble [data-role="text"]'); return t && t.textContent; });
     diag.mood = await page.evaluate(() => window.__anan.mood);
