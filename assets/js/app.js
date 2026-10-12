@@ -503,6 +503,11 @@
     applyLive();
     setStatus("待机中");
 
+    // 测试/调试接口
+    window.__anan = state;
+    window.__ananPlay = function (n) { state.live2d.engine.playGesture(n); };
+    window.AnAn.__ready = true;
+
     $("guardBtn").onclick = function () {
       $("guard").hidden = true;
       state.started = true;

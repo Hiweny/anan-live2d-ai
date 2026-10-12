@@ -1,0 +1,67 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  local:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i playwright@1.44.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+      - name: Serve site
+        run: |
+          python3 -m http.server 8000 --directory . >/dev/null 2>&1 &
+          sleep 1
+      - name: Run local test
+        env:
+          TEST_API_KEY: ${{ secrets.ANAN_TEST_API_KEY }}
+          TEST_API_BASE: ${{ secrets.ANAN_TEST_API_BASE }}
+          TEST_API_MODEL: ${{ secrets.ANAN_TEST_API_MODEL }}
+        run: node e2e/test.mjs http://localhost:8000 local
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-local
+          path: e2e/out
+
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i playwright@1.44.0 >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+      - name: Wait for GitHub Pages
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" https://hiweny.github.io/anan-live2d-ai/ || true)
+            echo "attempt $i: $code"
+            if [ "$code" = "200" ]; then break; fi
+            sleep 10
+          done
+      - name: Run live test
+        env:
+          TEST_API_KEY: ${{ secrets.ANAN_TEST_API_KEY }}
+          TEST_API_BASE: ${{ secrets.ANAN_TEST_API_BASE }}
+          TEST_API_MODEL: ${{ secrets.ANAN_TEST_API_MODEL }}
+        run: node e2e/test.mjs https://hiweny.github.io/anan-live2d-ai/ live
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-live
+          path: e2e/out
