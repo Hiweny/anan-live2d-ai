@@ -24,6 +24,8 @@ const page = await ctx.newPage();
 page.on("pageerror", (e) => diag.errors.push(String((e && e.stack) || e)));
 page.on("console", (m) => { if (m.type() === "error") diag.consoleErrors.push(m.text()); });
 
+const shot = (n) => page.screenshot({ path: `${outDir}/${tag}-${n}.jpg`, type: "jpeg", quality: 72 });
+
 const K = process.env.TEST_API_KEY, B = process.env.TEST_API_BASE, M = process.env.TEST_API_MODEL;
 diag.hasCreds = !!K;
 if (K) {
@@ -46,7 +48,7 @@ try {
   diag.steps.push("model-ready");
   await page.evaluate(() => { const s = document.getElementById("settings"); if (s) s.hidden = true; });
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: `${outDir}/${tag}-01-loaded.png` });
+  await shot("01-loaded");
 
   diag.paramCount = await page.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
   diag.paramError = await page.evaluate(() => window.__anan.live2d.paramError || null);
@@ -58,23 +60,30 @@ try {
       return d.map((x) => x.Name);
     } catch (e) { return null; }
   });
+  diag.modelBounds = await page.evaluate(() => {
+    try {
+      const b = window.__anan.live2d.model.getBounds();
+      const a = window.__anan.live2d.getHeadAnchor();
+      return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), headX: Math.round(a.x), headY: Math.round(a.y), vw: innerWidth, vh: innerHeight };
+    } catch (e) { return null; }
+  });
 
   // 开始（解锁音频）—— 用 evaluate 点击，规避呼吸动画导致的稳定性检测
   await clickEval("#guardBtn");
   await page.waitForTimeout(1000);
   diag.guardHidden = await page.evaluate(() => document.getElementById("guard").hidden);
-  await page.screenshot({ path: `${outDir}/${tag}-02-started.png` });
+  await shot("02-started");
 
   // 触发动作并截图，读取“上一帧实际叠加量”作为数值证据
   await page.evaluate(() => window.__ananPlay("look_away"));
   await page.waitForTimeout(600);
   diag.applied_lookaway = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
-  await page.screenshot({ path: `${outDir}/${tag}-03-gesture-lookaway.png` });
+  await shot("03-gesture-lookaway");
 
   await page.evaluate(() => window.__ananPlay("tilt"));
   await page.waitForTimeout(450);
   diag.applied_tilt = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
-  await page.screenshot({ path: `${outDir}/${tag}-04-gesture-tilt.png` });
+  await shot("04-gesture-tilt");
 
   // AI 对话（真实接口）
   if (K && M) {
@@ -87,7 +96,7 @@ try {
       return b.dataset.kind === "reply" && t && (t.textContent || "").length > 0;
     }, { timeout: 120000 }).catch(() => diag.steps.push("chat-timeout"));
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: `${outDir}/${tag}-05-chat.png` });
+    await shot("05-chat");
     diag.bubbleText = await page.evaluate(() => { const t = document.querySelector('#bubble [data-role="text"]'); return t && t.textContent; });
     diag.mood = await page.evaluate(() => window.__anan.mood);
     diag.historyLen = await page.evaluate(() => window.__anan.history.length);
@@ -96,7 +105,7 @@ try {
 } catch (e) {
   diag.fatal = String((e && e.stack) || e);
   diag.steps.push("fatal");
-  try { await page.screenshot({ path: `${outDir}/${tag}-error.png` }); } catch (_) {}
+  try { await shot("error"); } catch (_) {}
 }
 
 fs.writeFileSync(`${outDir}/${tag}-diag.json`, JSON.stringify(diag, null, 2));
