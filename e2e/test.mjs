@@ -92,7 +92,7 @@ try {
       const t = window.__anan.tts;
       t.resume();
       const r = await t.speak("你好呀，我是安An。", { engine: "edge", edgeVoice: "zh-CN-XiaoxiaoNeural", rate: 1, pitch: 1, volume: 0.0 });
-      return { engine: r && r.engine, last: t.lastEngine };
+      return { engine: r && r.engine, last: t.lastEngine, voice: t.lastVoice || null, err: t.lastError || null };
     } catch (e) { return { error: String((e && e.message) || e) }; }
   });
 

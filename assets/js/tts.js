@@ -156,10 +156,17 @@
       u.rate = cfg.rate || 1;
       u.pitch = cfg.pitch || 1;
       u.volume = cfg.volume == null ? 1 : cfg.volume;
-      if (cfg.voiceName) {
-        const v = speechSynthesis.getVoices().filter(function (x) { return x.name === cfg.voiceName; })[0];
-        if (v) u.voice = v;
+      var vs = speechSynthesis.getVoices() || [];
+      var v = null;
+      if (cfg.voiceName) v = vs.filter(function (x) { return x.name === cfg.voiceName; })[0];
+      if (!v) {
+        var zh = vs.filter(function (x) { return /zh|Chinese|\u4e2d\u6587/i.test(x.lang + " " + x.name); });
+        v = zh.filter(function (x) { return /Online \(Natural\)/i.test(x.name); })[0]
+          || zh.filter(function (x) { return /Xiaoxiao|Xiaoyi|Xiaobei|Huihui|Yaoyao|Kangkang|Xiaomo/i.test(x.name); })[0]
+          || zh[0] || null;
       }
+      if (v) { u.voice = v; if (v.lang) u.lang = v.lang; }
+      self.lastVoice = v ? v.name : "(default)";
       let ended = false;
       self.playing = true;
       const finish = function () { if (ended) return; ended = true; self.playing = false; resolve(); };
@@ -224,7 +231,8 @@
       return { engine: "edge" };
     } catch (e) {
       AnAn.log("Edge TTS 失败，回退浏览器语音", e);
-      cfg.onFallback && cfg.onFallback("Edge TTS 不可用，已改用浏览器语音");
+      this.lastError = String((e && e.message) || e);
+      cfg.onFallback && cfg.onFallback("微软 Edge TTS 暂不可用，已自动改用浏览器语音");
       this.lastEngine = "webspeech";
       await this._speakWeb(text, cfg);
       return { engine: "webspeech" };
