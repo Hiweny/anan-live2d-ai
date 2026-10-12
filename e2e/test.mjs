@@ -31,7 +31,8 @@ if (K) {
     try {
       localStorage.setItem("anan.settings.v1", JSON.stringify({
         baseUrl: b, apiKey: k, model: m, ttsEnabled: false, stream: true,
-        showReasoning: true, autoTags: true, history: 8, modelScale: 1
+        showReasoning: true, autoTags: true, history: 8, modelScale: 1,
+        idleMotion: false, gaze: false
       }));
     } catch (e) {}
   }, [K, B, M]);

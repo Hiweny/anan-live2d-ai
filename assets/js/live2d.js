@@ -91,14 +91,19 @@
     this._params = [];
     try {
       const cm = this.coreModel;
-      const n = (typeof cm.getParameterCount === "function") ? cm.getParameterCount() : 0;
-      for (let i = 0; i < n; i++) {
-        let id = cm.getParameterId(i);
-        if (id && typeof id.getString === "function") id = id.getString();
-        id = String(id);
-        this._params.push(id);
+      let ids = null;
+      try { if (cm._model && cm._model.parameters && cm._model.parameters.ids) ids = cm._model.parameters.ids; } catch (e) {}
+      if (ids && ids.length) {
+        for (let i = 0; i < ids.length; i++) this._params.push(String(ids[i]));
+      } else if (typeof cm.getParameterId === "function") {
+        const n = (typeof cm.getParameterCount === "function") ? cm.getParameterCount() : 0;
+        for (let i = 0; i < n; i++) {
+          let id = cm.getParameterId(i);
+          if (id && typeof id.getString === "function") id = id.getString();
+          this._params.push(String(id));
+        }
       }
-      AnAn.log("参数数量", n);
+      AnAn.log("参数数量", this._params.length);
     } catch (e) {
       this.paramError = String((e && e.message) || e);
       AnAn.log("参数表收集失败", e);

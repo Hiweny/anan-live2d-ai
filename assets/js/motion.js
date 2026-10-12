@@ -294,6 +294,7 @@
     if (mouthVal > 0.001) add(P.mouthY, mouthVal);
 
     /* 应用 */
+    this.lastAdds = adds; this.lastSets = sets;
     for (const id in adds) if (host.hasParam(id)) host.applyAdd(id, adds[id]);
     for (const id in sets) if (host.hasParam(id)) host.applySet(id, sets[id][0], sets[id][1]);
   };
