@@ -54,6 +54,11 @@
       collectList(v).forEach(function (a) { const n = normPose(a); if (n) poses.push(n); });
     };
 
+    // 0) MPL 自由骨骼指令 <bones>...</bones>（可跨行，内容含 ; 与逗号）
+    let bonesRaw = "";
+    s = s.replace(/<\s*bones\s*>([\s\S]*?)<\s*\/\s*bones\s*>/gi, function (m, body) { bonesRaw += " " + body; return ""; });
+    s = s.replace(/<\s*\/?\s*bones\s*\/?\s*>/gi, "");
+
     // 1) 闭合标签 <tag>..</tag>（可跨行）
     s = s.replace(/<\s*([A-Za-z\u4e00-\u9fa5]+)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/g, function (m, tag, val) {
       const t = tag.toLowerCase();
@@ -92,7 +97,7 @@
       if (seg.length > 1) parts = seg;
     }
     const clean = parts ? parts.join("\n") : s;
-    return { clean: clean, parts: parts, mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2), poseRaw: uniq(poseVals).slice(0, 4).join(",") };
+    return { clean: clean, parts: parts, mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2), poseRaw: uniq(poseVals).slice(0, 4).join(","), bones: bonesRaw.trim() };
   };
 
   AnAn.guessMood = function (text) {

@@ -266,7 +266,13 @@
         "· arms：" + arms + "\n" +
         "· facing：" + facing + "\n" +
         "例如 <pose>arms=cross,facing=left</pose> 表示抱着手臂、侧身朝左；平时不要随便改姿态，只在真的需要时使用。\n" +
-        "③ 多条气泡（可选）：想把回复像真人一样一句一句分成多个气泡，用反斜杠 \\ 分隔。\n" +
+        "③ 精细骨骼（可选·进阶：让你自由摆出任意姿势、真正接管身体）：\n<bones>骨骼 动作 方向 角度; …</bones>\n" +
+        "· 可写多句、用分号分隔；同一骨骼可在一句内用逗号叠动作。\n" +
+        "· 骨骼：head 头 / neck 颈 / upper_body 上半身 / lower_body 腰 / center 整体位移 / arm_l·arm_r 大臂 / elbow_l·elbow_r 小臂 / wrist_l·wrist_r 手腕 / leg_l·leg_r 大腿 / knee_l·knee_r 膝盖 / ankle_l·ankle_r 脚踝。\n" +
+        "· 动作：bend 弯 / turn·rotate 转 / sway 侧摆 / raise 抬(手臂) / move 位移；方向：forward 前 / backward 后 / left 左 / right 右 / up 上 / down 下；角度为度数(0~120)。\n" +
+        "· 例：<bones>arm_r bend forward 40; head turn left 20; leg_l bend forward 25</bones>\n" +
+        "· 只在需要精细/特别姿势时用它，普通对话用上面的 act 即可。\n" +
+        "④ 多条气泡（可选）：想把回复像真人一样一句一句分成多个气泡，用反斜杠 \\ 分隔。\n" +
         rules +
         "示例：\n<mood>happy</mood><act>cheer,smile</act>\n嗨～你来啦！\\今天想和我聊点什么呀？";
     }

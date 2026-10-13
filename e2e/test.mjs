@@ -88,7 +88,8 @@ try {
 
   diag.parse = await dp.evaluate(() => {
     const r = window.AnAn.parseIntent("<mood>happy</mood><act>nod,smile</act>\n<pose>shy</pose>\n你好呀\\今天过得怎么样？\\我给你讲件有意思的事");
-    return { parts: r.parts, mood: r.mood, acts: r.acts, poses: r.poses, poseRaw: r.poseRaw };
+    const rb = window.AnAn.parseIntent("<bones>arm_r bend forward 40; head turn left 20</bones>\n你好");
+    return { parts: r.parts, mood: r.mood, acts: r.acts, poses: r.poses, poseRaw: r.poseRaw, bones: rb.bones, bonesClean: rb.clean };
   });
   diag.live2dExpr = await dp.evaluate(() => { try { const m = window.__anan.live2d.model; const mgr = m.internalModel.motionManager.expressionManager; return { defs: ((mgr && (mgr.definitions || mgr._definitions)) || []).map(d => d.Name) }; } catch (e) { return { err: String(e.message) }; } });
   await dp.evaluate(() => window.__anan.live2d.setExpression("shy"));
@@ -140,6 +141,15 @@ try {
     await tp.waitForTimeout(Math.round(d * 1000 * 0.55));
   }
   diag.actsPlayed = actShot;
+
+  /* <bones> 自由骨骼（MPL 风格）实测 */
+  await tp.evaluate(() => window.__mmd3d.setBones("arm_r raise up 70; arm_l raise up 70"));
+  await tp.waitForTimeout(900); await shot(tp, "d13-bones-armsup");
+  diag.bonesArms = await tp.evaluate(ARM_PROBE);
+  await tp.evaluate(() => window.__mmd3d.setBones("head turn left 40; upper_body bend forward 25; leg_r bend forward 35"));
+  await tp.waitForTimeout(900); await shot(tp, "d13-bones-mix");
+  await tp.evaluate(() => window.__mmd3d.setBones(""));
+  await tp.waitForTimeout(400);
 
   /* 拖动旋转 */
   const yaw0 = await tp.evaluate(() => window.__mmd3d._yaw);

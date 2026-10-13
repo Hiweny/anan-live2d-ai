@@ -51,6 +51,21 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 
+  /* ── MPL 风格骨名别名（移植自 AmyangXYZ/MMD-MPL 语义骨名）── */
+  const BONE_ALIAS = {
+    head: "head", neck: "neck", upper_body: "upper", upperbody: "upper", body: "upper", chest: "upper", waist: "upper",
+    lower_body: "lower", lowerbody: "lower", pelvis: "lower", hips: "lower", hip: "lower",
+    center: "root", base: "root", root: "root",
+    shoulder_l: "shoulderL", shoulder_r: "shoulderR",
+    arm_l: "armL", arm_r: "armR", elbow_l: "elbowL", elbow_r: "elbowR",
+    wrist_l: "handL", wrist_r: "handR", hand_l: "handL", hand_r: "handR",
+    leg_l: "legL", leg_r: "legR", knee_l: "kneeL", knee_r: "kneeR",
+    ankle_l: "footL", ankle_r: "footR", foot_l: "footL", foot_r: "footR"
+  };
+  /* 方向 → 旋转轴 / 符号 */
+  const MPL_AXIS = { bend: "x", tilt: "x", turn: "y", rotate: "y", twist: "y", sway: "z", lean: "z" };
+  const MPL_SIGN = { forward: 1, backward: -1, front: 1, back: -1, left: 1, right: -1, up: 1, down: -1 };
+
   /* ── 动作库 ────────────────────────────────────────────────
      tracks 三型：{b:骨骼槽, a:'x'|'y'|'z', keys}（弧度，叠加）
                 {arm:'L'|'R', off:[[u,度],…]}（手臂夹角偏移）
@@ -248,6 +263,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._base = new Map();
     this._speaking = false; this._mouthLevel = 0; this._mouthTarget = 0; this._mouthSimT = 0; this._mouthScale = 1;
     this._posture = { arms: "down", facing: "front" };
+    this._mpl = [];
     this._armsCur = { L: -1.36, R: 1.36, src: null };
     this._last = 0; this._raf = null;
     this.onProgress(0);
@@ -493,6 +509,32 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     }
     this._posture = p;
   };
+
+  /* MPL 风格自由骨骼指令：形如 "arm_r bend forward 40; head turn left 20; leg_l bend forward 25;"
+     任意骨骼 / 方向 / 角度（度），持续生效到下一次改变。让 AI 真正"接管"身体。 */
+  MMD3D.prototype.setBones = function (text) {
+    const list = [];
+    if (text) {
+      String(text).split(/[\n;。；]+/).forEach(function (seg) {
+        seg = seg.trim(); if (!seg) return;
+        let bone = null;
+        seg.split(/[,，]+/).forEach(function (cl) {
+          const tk = cl.trim().split(/\s+/); if (!tk.length) return;
+          if (bone == null) { bone = tk[0].toLowerCase().replace(/[^a-z_]/g, ""); tk.shift(); }
+          if (!bone || !tk.length) return;
+          const action = tk[0].toLowerCase();
+          if (action === "reset" || action === "clear") { list.push({ bone: bone, reset: true }); return; }
+          let dir = "", amt = NaN;
+          for (let i = 1; i < tk.length; i++) {
+            const t = tk[i];
+            if (/^-?\d+(\.\d+)?$/.test(t)) amt = parseFloat(t); else dir = t.toLowerCase();
+          }
+          list.push({ bone: bone, action: action, dir: dir, amt: (isNaN(amt) ? 30 : amt) });
+        });
+      });
+    }
+    this._mpl = list;
+  };
   MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动 */ };
 
   MMD3D.prototype.setIdle = function (on) { this._idleOn = !!on; };
@@ -580,6 +622,30 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
         else if (tr.b === "__root") rootD[tr.a] = (rootD[tr.a] || 0) + val;
         else addBone(tr.b, tr.a, val);
       }
+    }
+
+    // MPL 自由骨骼（AI 直接接管任意骨骼/方向/角度）
+    for (let i = 0; i < this._mpl.length; i++) {
+      const it = this._mpl[i];
+      if (it.reset) continue;
+      const slot = BONE_ALIAS[it.bone] || it.bone;
+      const amt = Math.max(-135, Math.min(135, it.amt));
+      const sgn = MPL_SIGN[it.dir] || 1;
+      const act = it.action;
+      if (slot === "root" || act === "move" || act === "shift") {
+        const d = it.dir, v = amt * 0.05;
+        if (d === "up") rootD.y += v; else if (d === "down") rootD.y -= v;
+        else if (d === "left") rootD.x -= v; else if (d === "right") rootD.x += v;
+        else if (d === "backward" || d === "back") rootD.z += v; else if (d === "forward" || d === "front") rootD.z -= v;
+        continue;
+      }
+      if ((slot === "armL" || slot === "armR") && (act === "raise" || act === "lift")) {
+        armOff[slot === "armL" ? "L" : "R"] += (it.dir === "down" ? -Math.abs(amt) : Math.abs(amt));
+        continue;
+      }
+      const axis = MPL_AXIS[act];
+      if (axis) addBone(slot, axis, sgn * amt * DEG);
+      else if (slot === "armL" || slot === "armR") addBone(slot, "x", sgn * amt * DEG);
     }
 
     // 手臂：平滑到「姿态角 + 动作偏移」，消除换模型的畸形

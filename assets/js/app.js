@@ -184,9 +184,13 @@
       if (DEF.kind === "live2d" && AnAn.ACT_POSE && AnAn.ACT_POSE[a]) state.avatar.setExpression(AnAn.ACT_POSE[a]);
     });
   }
-  function applyPoses(poses, poseRaw) {
+  function applyPoses(poses, poseRaw, bonesRaw) {
     if (!state.avatar) return;
-    if (DEF.kind === "mmd") { state.avatar.setPosture(poseRaw || ""); return; }
+    if (DEF.kind === "mmd") {
+      state.avatar.setPosture(poseRaw || "");
+      if (state.avatar.setBones) state.avatar.setBones(bonesRaw || "");
+      return;
+    }
     (poses || []).forEach(function (p) { state.avatar.setExpression(p); });
   }
 
@@ -296,7 +300,7 @@
 
     applyMood(mood);
     applyActs(parsed.acts);
-    applyPoses(parsed.poses, parsed.poseRaw);
+    applyPoses(parsed.poses, parsed.poseRaw, parsed.bones);
     setStatus("回复中…", "speaking");
 
     // 分段：优先使用模型显式的 \ 分段
@@ -575,7 +579,7 @@
     };
     $("btnResetModel").onclick = function () {
       S.modelScaleAdjust = AnAn.DEFAULTS.modelScaleAdjust; S.modelX = 0; S.modelY = 0; S.modelOpacity = 1; S.gaze = true; S.idleMotion = true; S.mouthScale = 1;
-      if (state.mmd) { state.mmd._yaw = 0; state.mmd._pitch = 0.08; state.mmd._dist = state.mmd._baseDist; state.mmd.setPosture(""); }
+      if (state.mmd) { state.mmd._yaw = 0; state.mmd._pitch = 0.08; state.mmd._dist = state.mmd._baseDist; state.mmd.setPosture(""); state.mmd.setBones(""); }
       saveSettings(); fillSettings(); applyLive();
     };
     $("btnTestMotion").onclick = function () {
