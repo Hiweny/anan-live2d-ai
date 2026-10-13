@@ -150,6 +150,19 @@ try {
   }
   diag.actsPlayed = actShot;
 
+  /* 手臂轴向探针：对 armL 分别加 x/y/z 旋转，读手部三维位移，确定各轴语义 */
+  diag.axis = {};
+  await tp.evaluate(() => window.__mmd3d.setPosture("arms=down"));
+  await tp.waitForTimeout(400);
+  diag.axis.base = await tp.evaluate(ARM_PROBE);
+  for (const ax of ["x", "y", "z"]) {
+    await tp.evaluate((a) => window.__mmd3d.debugSet("armL", a, 0.8), ax);
+    await tp.waitForTimeout(500);
+    diag.axis[ax] = await tp.evaluate(ARM_PROBE);
+    await tp.evaluate((a) => window.__mmd3d.debugSet("armL", a, 0), ax);
+    await tp.waitForTimeout(150);
+  }
+
   /* <bones> 自由骨骼（MPL 风格）实测 */
   await tp.evaluate(() => window.__mmd3d.setBones("arm_r raise up 70; arm_l raise up 70"));
   await tp.waitForTimeout(900); await shot(tp, "d13-bones-armsup");

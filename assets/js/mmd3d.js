@@ -260,6 +260,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._speaking = false; this._mouthLevel = 0; this._mouthTarget = 0; this._mouthSimT = 0; this._mouthScale = 1;
     this._posture = { arms: "down", facing: "front" };
     this._mpl = [];
+    this._dbg = null;
     this._armsCur = { L: -1.36, R: 1.36, src: null };
     this._last = 0; this._raf = null;
     this.onProgress(0);
@@ -531,6 +532,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     }
     this._mpl = list;
   };
+  MMD3D.prototype.debugSet = function (slot, axis, val) { this._dbg = this._dbg || {}; this._dbg[slot + ":" + axis] = val; };
   MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动 */ };
 
   MMD3D.prototype.setIdle = function (on) { this._idleOn = !!on; };
@@ -643,6 +645,9 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       const axis = MPL_AXIS[act];
       if (axis) addBone(slot, axis, sgn * amt * DEG);
     }
+
+    // 调试覆盖（轴向校准用）
+    if (this._dbg) { for (const k in this._dbg) { const p = k.split(":"); addBone(p[0], p[1], this._dbg[k]); } }
 
     // 手臂：平滑到「姿态角 + 动作偏移」，消除换模型的畸形
     const k = Math.min(1, dt * 7);
