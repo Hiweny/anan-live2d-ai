@@ -70,7 +70,7 @@ const ARM_PROBE = `(() => {
     const out = { H: Math.round(H), calib: mm._calib };
     ["L","R"].forEach(s => {
       const arm = mm._bones["arm"+s], hand = mm._bones["hand"+s] || mm._bones["elbow"+s];
-      if (arm && hand) { const a = gp(arm), h = gp(hand); out[s] = { dx: +((h.x-a.x)/H).toFixed(3), dy: +((h.y-a.y)/H).toFixed(3) }; }
+      if (arm && hand) { const a = gp(arm), h = gp(hand); out[s] = { dx: +((h.x-a.x)/H).toFixed(3), dy: +((h.y-a.y)/H).toFixed(3), dz: +((h.z-a.z)/H).toFixed(3) }; }
     });
     return out;
   } catch (e) { return { err: String(e.message) }; }
