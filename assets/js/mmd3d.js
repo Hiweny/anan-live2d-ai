@@ -482,7 +482,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     else if (mood === "calm") this.playGesture("sway");
     else if (mood === "thinking") this.playGesture("think");
     else if (mood === "shy") this.playGesture("shy");
-    else if (mood === "angry") this.playGesture("arms_cross");
+    else if (mood === "angry") this.playGesture("shake");
     else if (mood === "surprised") this.playGesture("surprise");
   };
   MMD3D.prototype.clearMood = function () { this._mood = null; };
