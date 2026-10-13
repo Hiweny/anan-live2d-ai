@@ -107,6 +107,10 @@ try {
     });
   }
 
+  // 等待动画/请求结束，再切换模型
+  await dp.waitForFunction(() => window.__anan && window.__anan.busy === false, { timeout: 90000 }).catch(() => diag.steps.push("busy-wait-timeout"));
+  await dp.waitForTimeout(600);
+
   // 切换模型 → 女仆
   diag.switch = await dp.evaluate(async () => {
     try { await window.__ananSwitch("maid"); return { ok: true, id: window.__ananModelId }; }
@@ -116,6 +120,8 @@ try {
   await shot(dp, "d4-maid");
   diag.maidParamCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
   diag.maidHasArm = await dp.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamArmR") !== -1; } catch (e) { return null; } });
+  diag.maidArmParams = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().filter((p) => /arm|Arm/i.test(p)); } catch (e) { return null; } });
+  diag.maidHistoryLen = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.mem.v2")).maid.history.length; } catch (e) { return null; } });
   diag.maidBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; });
   await dctx.close();
 
