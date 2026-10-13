@@ -54,6 +54,12 @@ async function screencast(ctx, page, name, ms, maxDim = 160) {
 }
 
 // 读左右手相对肩的世界坐标（用于客观判断"手臂是否真的在身侧/抬起"）
+const POSE_PROBE = `(() => { try {
+  const mm = window.__mmd3d; const B = (s,a) => (mm._bones[s] ? +mm._bones[s].rotation[a].toFixed(2) : null);
+  return { headX:B("head","x"), headY:B("head","y"), headZ:B("head","z"), upperX:B("upper","x"), upperZ:B("upper","z"),
+    lowerY:B("lower","y"), legL:B("legL","x"), kneeL:B("kneeL","x"), rootX:B("center","x"),
+    armL:+mm._armsCur.L.toFixed(2), armR:+mm._armsCur.R.toFixed(2), posY:+mm._model.position.y.toFixed(2), rotY:+mm._model.rotation.y.toFixed(2) };
+} catch (e) { return { err: String(e.message) }; } })()`;
 const ARM_PROBE = `(() => {
   try {
     const mm = window.__mmd3d || (window.__anan && window.__anan.mmd);
@@ -137,6 +143,8 @@ try {
     const d = (durs[a] || 1.5);
     await tp.waitForTimeout(Math.round(d * 1000 * 0.4));
     actShot[a] = ok;
+    diag.actProbe = diag.actProbe || {};
+    diag.actProbe[a] = await tp.evaluate(POSE_PROBE);
     await shot(tp, "d11-act-" + a);
     await tp.waitForTimeout(Math.round(d * 1000 * 0.55));
   }

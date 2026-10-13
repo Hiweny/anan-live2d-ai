@@ -40,14 +40,14 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     return d;
   }
 
-  /* 手臂姿态：以「相对水平向外」的夹角描述（度）
+  /* 手臂姿态：以「相对水平向外」的夹角描述（度，按左臂给出；右臂镜像 = 180°-左）
      -90° = 自然垂下 / 0° = 水平张开(T) / +90° = 笔直高举 */
   const ARM_POSE = {
-    down: { deg: -78 },   // 自然垂放
-    open: { deg: -50 },   // 轻轻张开
-    T:    { deg: -4 },    // 平举
-    up:   { deg: 68 },    // 举起
-    high: { deg: 84 }     // 高高举起
+    down: { L: -74 },   // 自然垂放（略向外，避免贴进身体而"看不见"）
+    open: { L: -46 },   // 轻轻张开
+    T:    { L: -4 },    // 平举
+    up:   { L: 74 },    // 举起
+    high: { L: 88 }     // 高高举起
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 
@@ -580,17 +580,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._render();
   };
 
-  /* 依据当前姿态 + 校准，算出左右臂应加的 z 旋转（弧度） */
+  /* 依据当前姿态 + 校准，算出左右臂应加的 z 旋转（弧度）
+     右臂目标角 = 180° - 左臂目标角（左右镜像），角度偏移在两臂上都是"抬升" */
   MMD3D.prototype._armTarget = function (side, posture, offDeg) {
     const base = ARM_POSE[posture] || ARM_POSE.down;
+    const off = offDeg || 0;
+    const deg = (side === "L") ? (base.L + off) : (180 - base.L - off);
     const calib = this._calib[side];
-    const deg = base.deg + (offDeg || 0);
-    if (!calib) {
-      /* 无校准信息：退化为直接旋转（左 -/右 + 下垂方向） */
-      const th = deg * DEG;
-      return side === "L" ? th : -th;
-    }
-    return deg * DEG - calib.alpha;
+    const alpha = calib ? calib.alpha : (side === "L" ? 0 : Math.PI);
+    return deg * DEG - alpha;
   };
   MMD3D.prototype._syncArms = function (instant) {
     ["L", "R"].forEach(function (side) {
@@ -616,9 +614,9 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       if (u >= 1) { this._acts.splice(i, 1); continue; }
       for (let j = 0; j < a.tracks.length; j++) {
         const tr = a.tracks[j];
+        if (tr.arm) { armOff[tr.arm] += sample(tr.off, u); continue; }
         const val = sample(tr.keys, u);
         if (tr.m) morphAcc[tr.m] = (morphAcc[tr.m] || 0) + val;
-        else if (tr.arm) armOff[tr.arm] += val;
         else if (tr.b === "__root") rootD[tr.a] = (rootD[tr.a] || 0) + val;
         else addBone(tr.b, tr.a, val);
       }
