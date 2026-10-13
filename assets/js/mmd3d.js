@@ -27,15 +27,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   }
 
   /* 手臂「下垂」基准（把 T-pose 放下来）：左腕 +z 抬起 / 右腕 -z 抬起 */
-  const REST = { armL: { z: -0.66 }, armR: { z: 0.66 } };
+  const REST = { armL: { z: -1.12 }, armR: { z: 1.12 } };
 
   /* 姿态预设：手臂 z 抬/放、x 前后摆，肘部 z 弯曲（左右镜像） */
   const ARMS = {
-    down:  { armL: { z: -0.66, x: 0.0 }, armR: { z: 0.66, x: 0.0 }, eL: 0, eR: 0 },
-    open:  { armL: { z: -0.28, x: 0.0 }, armR: { z: 0.28, x: 0.0 }, eL: 0, eR: 0 },
-    up:    { armL: { z: 1.15, x: 0.0 }, armR: { z: -1.15, x: 0.0 }, eL: 0, eR: 0 },
-    cross: { armL: { z: -0.30, x: -0.38 }, armR: { z: 0.30, x: -0.38 }, eL: -1.15, eR: 1.15 },
-    hips:  { armL: { z: -0.72, x: 0.16 }, armR: { z: 0.72, x: 0.16 }, eL: -1.35, eR: 1.35 }
+    down:  { armL: { z: -1.12, x: 0.0 }, armR: { z: 1.12, x: 0.0 }, eL: 0, eR: 0 },
+    open:  { armL: { z: -0.5, x: 0.0 }, armR: { z: 0.5, x: 0.0 }, eL: 0, eR: 0 },
+    up:    { armL: { z: 1.25, x: 0.0 }, armR: { z: -1.25, x: 0.0 }, eL: 0, eR: 0 },
+    cross: { armL: { z: -0.5, x: -0.4 }, armR: { z: 0.5, x: -0.4 }, eL: -1.2, eR: 1.2 },
+    hips:  { armL: { z: -0.9, x: 0.15 }, armR: { z: 0.9, x: 0.15 }, eL: -1.4, eR: 1.4 }
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 
@@ -508,7 +508,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     if (head) {
       const v = new THREE.Vector3();
       head.getWorldPosition(v);
-      v.y += (this._modelH || 20) * 0.06;
+      v.y += (this._modelH || 20) * 0.19;
       v.project(cam);
       const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
       this._headScreen = { x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H };
