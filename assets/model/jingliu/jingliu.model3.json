@@ -1,0 +1,35 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "jingliu.moc3",
+		"Textures": [
+			"textures/texture_00.png"
+		],
+		"Physics": "jingliu.physics3.json",
+		"DisplayInfo": "jingliu.cdi3.json",
+		"Expressions": [
+			{
+				"Name": "yandai",
+				"File": "expressions/yandai.exp3.json"
+			}
+		]
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthOpenY"
+			]
+		}
+	],
+	"HitAreas": []
+}

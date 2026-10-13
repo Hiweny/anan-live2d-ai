@@ -72,11 +72,25 @@
 
   function headAnchor() { return state.avatar ? state.avatar.getHeadAnchor() : { x: window.innerWidth / 2, y: 200 }; }
   function layoutStack() {
-    const a = headAnchor();
-    const left = Math.max(120, Math.min(window.innerWidth - 120, a.x));
+    if (!stackEl) return;
+    const a = headAnchor() || {};
+    const W = window.innerWidth, H = window.innerHeight;
+    const topbarH = ($("topbar") && $("topbar").getBoundingClientRect().height) || 60;
+    const dockH = ($("dock") && $("dock").getBoundingClientRect().height) || 90;
+    const dockTop = H - dockH;
+    /* 气泡最大宽度与 CSS .bubble{max-width:min(330px,72vw)} 对齐，防止左右溢出屏幕 */
+    const halfW = Math.min(330, W * 0.72) / 2 + 8;
+    const left = Math.max(halfW, Math.min(W - halfW, Number.isFinite(a.x) ? a.x : W / 2));
     stackEl.style.left = left + "px";
     stackEl.style.top = "auto";
-    stackEl.style.bottom = (window.innerHeight - a.y) + "px";
+    const stackH = stackEl.getBoundingClientRect().height || 0;
+    /* 锚点（气泡底边）y：既落在可视区内，又给整栈留出上下空间 */
+    let y = Number.isFinite(a.y) ? a.y : H * 0.3;
+    const minY = topbarH + 10 + stackH;
+    const maxY = dockTop - 8;
+    if (minY > maxY) y = Math.max(topbarH + 10, Math.min(H - 10, minY));
+    else y = Math.max(minY, Math.min(maxY, y));
+    stackEl.style.bottom = (H - y) + "px";
     trimStack();
   }
   function trimStack() {
@@ -638,6 +652,7 @@
     window.__ananKind = DEF.kind;
     window.__ananLoading = false;
     window.__ananPlay = function (n) { state.avatar && state.avatar.playGesture(n); };
+    window.__ananLayoutStack = layoutStack;   // 测试钩子
     window.__ananSwitch = function (id) { return switchModel(id); };
     window.AnAn.__ready = true;
   }

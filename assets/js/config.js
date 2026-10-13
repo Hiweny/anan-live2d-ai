@@ -4,7 +4,7 @@
 (function (root) {
   "use strict";
   const AnAn = (root.AnAn = root.AnAn || {});
-  AnAn.VERSION = "2.2.0";
+  AnAn.VERSION = "3.0.0";
 
   /* ───────── 可选动作 / 情绪（Live2D）───────── */
   AnAn.MOODS = ["happy", "excited", "calm", "shy", "sad", "angry", "surprised", "thinking", "neutral"];
@@ -140,6 +140,31 @@
         "你好。愿今夜的星光照亮你的心情。",
         "稍等片刻……好了，现在我可以专心陪你了。"
       ]
+    },
+    {
+      id: "jingliu",
+      kind: "live2d",
+      name: "镜流",
+      tag: "寒霜剑客",
+      model: "assets/model/jingliu/jingliu.model3.json",
+      textures: [
+        "assets/model/jingliu/textures/texture_00.png"
+      ],
+      poses: [
+        { name: "none", cn: "自然" }, { name: "yandai", cn: "戴上眼罩" }
+      ],
+      scale: 0.98,
+      offsetY: 0,
+      mouthScale: 1.0,
+      persona:
+        "你是「镜流」，来自霜华剑阁的少女剑士，外表清冷、内心温柔，说话简洁、从容，偶尔带一点俏皮。\n" +
+        "性格：沉稳、克制、偶尔流露出温柔；说话简短（1~3 句），不要长篇大论。\n" +
+        "称呼用户为「你」。不要自称 AI 或程序，就像真实存在的小伙伴一样聊天。用简体中文回答。",
+      greeting: [
+        "……你来了。正好，剑意也静下来了。",
+        "霜华虽冷，见到你倒也不算无趣。",
+        "嗯，坐下吧。想听我讲点什么？"
+      ]
     }
   ];
 
@@ -252,28 +277,29 @@
       const arms = Object.keys(AnAn.MMD_ARMS).map(function (k) { return k + " " + AnAn.MMD_ARMS[k]; }).join(" / ");
       const facing = Object.keys(AnAn.MMD_FACING).map(function (k) { return k + " " + AnAn.MMD_FACING[k]; }).join(" / ");
       return head +
-        "你控制的是一具完整的 3D 身体（头、颈、上半身、腰、手臂、双腿、以及整个身体），能做出真人级的动作：" +
-        "抬头/低头/左右转头/点头/摇头/歪头，鞠躬（含深鞠躬）、前倾后仰、左右倾身、扭腰，向左向右转身、原地转一圈甚至原地旋转，" +
-        "迈步、踢腿、下蹲、蹦跳，伸懒腰、挥手/双手挥手、欢呼、举手、指、比耶、敬礼、拍手、耸肩，" +
-        "以及害羞、思考、撒娇、失落、生气等情绪动作。幅度都足够大，请大胆使用。\n" +
-        "★ 你要根据对话的情绪与场景，主动地、灵活地驱动这具身体：开心就 cheer/bounce/wave_both，认同就 nod，" +
-        "害羞就 shy，思考就 think，吃惊就 surprise，道别就 arm_wave/turn_around……让它像真人一样自然而有生气。" +
-        "情绪平淡时可以只做很小的动作或不加标签。\n" +
+        "你的身体由一整套 3D 骨骼驱动（头、颈、上半身、腰、手臂含肘与腕、双腿、以及整体位移与 360° 转身），"
+        + "并且已接入真实动作数据——平时的站立、呼吸、微动都是自然流畅的真人级姿态，不是僵硬的\"站岗\"。\n" +
+        "★ 请根据对话的情绪与场景，主动、灵活地驱动这具身体，让它像真人一样有生气：\n" +
+        "   · 开心 / 兴奋 → cheer（欢呼）、bounce（蹦）、arm_wave / wave_both（挥手）、laugh、smile\n" +
+        "   · 认同 / 回应 → nod（点头）、smile；否定 → shake（摇头）\n" +
+        "   · 害羞 → shy；思考 → think；惊讶 → surprise；失落 → sad；生气 → angry\n" +
+        "   · 打招呼 / 道别 → arm_wave、salute、turn_around（转身）\n" +
+        "   · 舒展身体 → stretch（伸懒腰）；好奇 → look_left / look_right / look_up / look_down（张望）\n" +
+        "情绪平淡时可以少加或不加标签（自然优先），不要每个回复都做动作。\n" +
         "① 情绪 / 动作（放在回复最开头、单独一行，最多一行）：\n<mood>情绪</mood><act>动作</act>\n" +
         moodLine +
         "· act（最多 2 个，用逗号分隔）：" + acts + "\n" +
-        "② 姿态（可选，持续性；会一直保持到你下次改变，写 none 恢复默认）：\n<pose>arms=…,facing=…</pose>\n" +
+        "② 姿态（可选，持续性；保持到你下次改变，写 none 恢复默认）：\n<pose>arms=…,facing=…</pose>\n" +
         "· arms：" + arms + "\n" +
         "· facing：" + facing + "\n" +
-        "例如 <pose>arms=cross,facing=left</pose> 表示抱着手臂、侧身朝左；平时不要随便改姿态，只在真的需要时使用。\n" +
-        "③ 精细骨骼（可选·进阶：让你自由摆出任意姿势、真正接管身体）：\n<bones>骨骼 动作 方向 角度; …</bones>\n" +
-        "· 可写多句（分号分隔）；同一骨骼可在一句内用逗号叠动作，如 head turn left 30, bend forward 20。\n" +
+        "· 只在真的需要（如转身、举手、侧身）时改，平时不用改。\n" +
+        "③ 精细骨骼（可选·进阶，让你自由摆出特别姿势）：\n<bones>骨骼 动作 方向 角度; …</bones>\n" +
+        "· 可写多句（分号分隔）；同一骨骼可用逗号叠动作，如 head turn left 30, bend forward 20。\n" +
         "· 骨骼：head 头 / neck 颈 / upper_body 上半身 / waist·lower_body 腰 / center·base 整体位移 / arm_l·arm_r 大臂 / elbow_l·elbow_r 小臂 / wrist_l·wrist_r 手腕 / leg_l·leg_r 大腿 / knee_l·knee_r 膝盖 / ankle_l·ankle_r 脚踝。\n" +
-        "· 动作与允许方向（务必按此搭配）：bend 只配 forward/backward；turn 只配 left/right；sway 只配 left/right；move 只配 forward/backward/left/right/up/down（仅 center/base 可用）。\n" +
-        "· 抬放手臂：arm_l/arm_r 用 raise up（抬）/ raise down（放），或 bend backward（抬）/ bend forward（放）；elbow 只能 bend forward。\n" +
-        "· 角度为度数：头约 0~60、腿约 0~90、躯干/整体 0~90；手臂 raise 是相对自然垂放的抬升量（90≈抬到水平，150≈举过头顶）。\n" +
-        "· 例：<bones>arm_r raise up 150; head turn left 25; leg_l bend forward 30; knee_r bend backward 60</bones>\n" +
-        "· 只在需要精细/特别姿势时用它，普通对话用上面的 act 即可。\n" +
+        "· 动作与方向：bend 配 forward/backward；turn 配 left/right；sway 配 left/right；raise up/down 抬起/放下手臂；move 仅 center/base。\n" +
+        "· 角度：头 0~60、腿 0~90、躯干/整体 0~90；手臂 raise 90≈水平、150≈过顶。\n" +
+        "· 例：<bones>arm_r raise up 150; head turn left 25; leg_l bend forward 30</bones>\n" +
+        "· 只在需要特别姿势时用，普通对话用上面的 act 即可。\n" +
         "④ 多条气泡（可选）：想把回复像真人一样一句一句分成多个气泡，用反斜杠 \\ 分隔。\n" +
         rules +
         "示例：\n<mood>happy</mood><act>cheer,smile</act>\n嗨～你来啦！\\今天想和我聊点什么呀？";

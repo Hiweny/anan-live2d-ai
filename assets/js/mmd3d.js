@@ -95,6 +95,10 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     look_right: { dur: 1.8, tracks: [
       { b: "head", a: "y", keys: [[0, 0], [0.25, -0.74], [0.72, -0.66], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+    look_away: { dur: 2.0, tracks: [
+      { b: "head", a: "y", keys: [[0, 0], [0.28, 0.5], [0.78, 0.44], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.3, 0.12], [0.8, 0.1], [1, 0]] },
+      { b: "neck", a: "y", keys: [[0, 0], [0.3, 0.12], [1, 0]] }] },
 
     /* ── 上半身 / 腰 ── */
     bow: { dur: 2.0, tracks: [
@@ -265,6 +269,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._posture = { arms: "down", facing: "front" };
     this._mpl = [];
     this._dbg = null;
+    this._vmdMixer = null; this._vmdIdle = null; this._vmdIdleAction = null; this._vmdOn = false;
     this._armsCur = { L: -1.36, R: 1.36, src: null };
     this._last = 0; this._raf = null;
     this.onProgress(0);
@@ -361,8 +366,31 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._idleT = 3;
     this._startLoop();
     this.onProgress(1);
+    this._loadVmd(loader, model);
     root.__mmd3d = this;   // 调试/测试入口
     return this;
+  };
+
+  /* ── 现成 MMD 动作数据（VMD）作为自然基底姿态 ──
+     移植自 three.js MMDLoader + THREE.AnimationMixer。
+     VMD 是 MMD 标准动作数据，提供真人级自然姿态（肘部弯曲、重心微移），
+     让角色不再像“站岗”。程序化手势在此之上以增量叠加。 */
+  MMD3D.prototype._loadVmd = function (loader, model) {
+    const self = this;
+    this._vmdMixer = new THREE.AnimationMixer(model);
+    const loadOne = function (url, cb) {
+      try { loader.loadAnimation(url, model, function (clip) { cb(clip); }, null, function () {}); } catch (e) {}
+    };
+    loadOne("assets/model/motions/stand.vmd", function (clip) {
+      try {
+        self._vmdIdle = clip;
+        const act = self._vmdMixer.clipAction(clip);
+        act.setLoop(THREE.LoopRepeat, Infinity);
+        act.play();
+        self._vmdIdleAction = act;
+        self._vmdOn = true;
+      } catch (e) {}
+    });
   };
 
   MMD3D.prototype._initRenderer = function () {
@@ -539,7 +567,12 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   MMD3D.prototype.debugSet = function (slot, axis, val) { this._dbg = this._dbg || {}; this._dbg[slot + ":" + axis] = val; };
   MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动 */ };
 
-  MMD3D.prototype.setIdle = function (on) { this._idleOn = !!on; };
+  MMD3D.prototype.setIdle = function (on) {
+    this._idleOn = !!on;
+    /* 待机开关同时控制现成动作数据（VMD）的播放与暂停 */
+    if (this._vmdIdleAction) { try { this._vmdIdleAction.paused = !on; } catch (e) {} }
+    if (this._vmdIdle) this._vmdOn = !!on;
+  };
   MMD3D.prototype.setMouthScale = function (s) { this._mouthScale = s || 1; };
   MMD3D.prototype.setSpeaking = function (on) { this._speaking = !!on; if (!on) this._mouthTarget = 0; };
   MMD3D.prototype.setMouthLevel = function (v) { this._mouthTarget = Math.max(0, Math.min(1, v)); };
@@ -570,7 +603,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._mouthLevel += (this._mouthTarget - this._mouthLevel) * Math.min(1, dt * 16);
 
     this._breath = (this._breath || 0) + dt;
-    if (this._idleOn !== false && this._idleT > 2.5 && this._ptr.size === 0) this._yaw += dt * 0.16;
+    /* 默认不再自动旋转（用户要求停掉）*/
     /* 闲置时随机小动作，让角色"自己动起来" */
     if (this._idleOn !== false && this._idleT > 13 && this._ptr.size === 0) {
       this._idleT = 0;
@@ -602,6 +635,8 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   MMD3D.prototype._drive = function (dt) {
     const self = this;
     this._base.forEach(function (v, b) { b.rotation.x = v.x; b.rotation.y = v.y; b.rotation.z = v.z; });
+    /* 现成 VMD 动作数据（真实动作）作为基底，写入自然姿态 */
+    if (this._vmdOn && this._vmdMixer) { try { this._vmdMixer.update(dt); } catch (e) {} }
 
     const rootD = { x: 0, y: 0, z: 0, ry: 0, rz: 0 };
     const morphAcc = {};
@@ -662,8 +697,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       const th = self._armTarget(side, self._posture.arms, armOff[side]);
       self._armsCur[side] += angleDelta(self._armsCur[side], th) * k;
     });
-    addBone("armL", "z", this._armsCur.L);
-    addBone("armR", "z", this._armsCur.R);
+    if (this._vmdOn) {
+      /* VMD 已给出自然手臂；此处只叠加「姿态增量 + 动作偏移」 */
+      const dL = ((ARM_POSE[this._posture.arms] || ARM_POSE.down).L - ARM_POSE.down.L) * DEG;
+      addBone("armL", "z", dL + armOff.L * DEG);
+      addBone("armR", "z", -dL - armOff.R * DEG);
+    } else {
+      addBone("armL", "z", this._armsCur.L);
+      addBone("armR", "z", this._armsCur.R);
+    }
 
     // 情绪 morph
     if (this._mood != null && this._morphs[this._mood]) {

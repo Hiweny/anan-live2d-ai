@@ -91,6 +91,8 @@ try {
     return { settings: at("#btnSettings"), mute: at("#btnMute") };
   });
   try { await dp.click("#btnSettings", { timeout: 5000 }); await dp.waitForSelector("#settings:not([hidden])", { timeout: 3000 }); diag.settingsOpen = true; await clickEval(dp, "[data-close]"); } catch (e) { diag.settingsOpen = false; }
+  diag.aboutRemoved = await dp.evaluate(() => !document.querySelector("[data-tab=\"about\"]") && !document.querySelector("[data-page=\"about\"]"));
+  diag.tabs = await dp.evaluate(() => Array.from(document.querySelectorAll("#settingsTabs .tab")).map(t => t.dataset.tab));
 
   diag.parse = await dp.evaluate(() => {
     const r = window.AnAn.parseIntent("<mood>happy</mood><act>nod,smile</act>\n<pose>shy</pose>\n你好呀\\今天过得怎么样？\\我给你讲件有意思的事");
@@ -179,7 +181,7 @@ try {
   diag.drag = { yaw0: +yaw0.toFixed(3), yaw1: +(await tp.evaluate(() => window.__mmd3d._yaw)).toFixed(3) };
 
   /* 新模型：芙宁娜 / 星临者 */
-  for (const id of ["fu", "star"]) {
+  for (const id of ["fu", "star", "jingliu"]) {
     try {
       await tp.evaluate(async (i) => { await window.__ananSwitch(i); }, id);
       await tp.waitForFunction(() => window.__ananLoading === false, { timeout: 180000 }).catch(() => {});
@@ -218,8 +220,8 @@ try {
   await kp.waitForTimeout(1200);
   await shot(kp, "k1-dark");
   /* 静置期录屏（真正抓"背景闪烁"） */
-  diag.flashFramesIdle = await screencast(kctx, kp, "dark-idle", 6000);
-  diag.dark = await kp.evaluate(() => ({ htmlClass: document.documentElement.className, htmlBg: getComputedStyle(document.documentElement).backgroundColor, canvasBg: getComputedStyle(document.getElementById("live2d-canvas")).backgroundImage.slice(0, 40) }));
+  diag.flashFramesIdle = await screencast(kctx, kp, "dark-idle", 9000);
+  diag.dark = await kp.evaluate(() => ({ htmlClass: document.documentElement.className, htmlBg: getComputedStyle(document.documentElement).backgroundColor, canvasBg: getComputedStyle(document.getElementById("live2d-canvas")).backgroundImage, canvasWC: getComputedStyle(document.getElementById("live2d-canvas")).willChange }));
   await kctx.close();
 } catch (e) {
   diag.fatal = String((e && e.stack) || e);
