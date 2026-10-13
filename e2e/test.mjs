@@ -84,6 +84,27 @@ try {
     diag.mood = await dp.evaluate(() => window.__anan.mood);
     diag.historyLen = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.mem.v2")).anan.history.length; } catch (e) { return null; } });
     diag.lastReasoning = await dp.evaluate(() => (window.__anan.lastReasoning || "").slice(0, 80));
+
+    // 长回复 → 应自动启用消息栏（mode A）
+    await dp.fill("#chatInput", "用至少六句话详细介绍一下你自己");
+    await clickEval(dp, "#btnSend");
+    await dp.waitForFunction(() => document.querySelectorAll("#feed .msg.ai").length > 0, { timeout: 120000 }).catch(() => diag.steps.push("long-timeout"));
+    await dp.waitForTimeout(2200);
+    diag.feedMode = await dp.evaluate(() => ({ aiMsgs: document.querySelectorAll("#feed .msg.ai").length, headBubbles: document.querySelectorAll("#bubbleStack .bubble").length }));
+    await shot(dp, "d5-long");
+
+    // 记忆压缩
+    diag.compact = await dp.evaluate(async () => {
+      try {
+        const s = JSON.parse(localStorage.getItem("anan.settings.v2") || "{}");
+        const st = { summary: "", history: [] };
+        for (let i = 0; i < 12; i++) st.history.push({ role: i % 2 ? "assistant" : "user", content: "这是第" + i + "条消息，用来测试记忆压缩。" + "内容内容内容内容内容内容内容内容内容内容" });
+        const before = st.history.length;
+        const llm = new window.AnAn.LLM({ baseUrl: s.baseUrl, apiKey: s.apiKey, model: s.model });
+        const r = await window.AnAn.compact(llm, { ctxWindow: 2000, keepRecent: 2 }, st, "你是测试角色。");
+        return { compacted: r.compacted, summaryLen: (st.summary || "").length, histBefore: before, histAfter: st.history.length, err: r.error || null };
+      } catch (e) { return { err: String((e && e.message) || e) }; }
+    });
   }
 
   // 切换模型 → 女仆
