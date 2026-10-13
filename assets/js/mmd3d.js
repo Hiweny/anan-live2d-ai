@@ -130,6 +130,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this.canvas = opts.canvas;
     this.onProgress = opts.onProgress || function () {};
     this.onHit = opts.onHit || function () {};
+    this.onAnchor = opts.onAnchor || function () {};
     this.def = null;
     this._ready = false;
     this._visible = false;
