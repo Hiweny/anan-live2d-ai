@@ -1,8 +1,14 @@
 /* ═══════════════════════════════════════════════════════════
-   mmd3d.js — 3D（MMD / PMX）控制器 v2
+   mmd3d.js — 3D（MMD / PMX）控制器 v3
    Three.js + MMDLoader（无物理，纯程序化驱动）
-   能力：拖动旋转 / 缩放 / 闲置慢转 / 自然站姿 /
-        全身体动作（含 360° 转身）/ 姿态（抱臂・叉腰…）/ 表情 morph / 口型
+   能力：拖动旋转 / 缩放 / 闲置慢转 / 手臂自动校准（换模型不再畸形）/
+        全身大范围动作（头/颈/上半身/下半身/腿/整体位移与 360° 转身）/
+        姿态（垂放・张开・平举・高举・抱臂・叉腰…）/ 表情 morph / 口型
+   ─────────────────────────────────────────────────────────
+   ★ 手臂自动校准：不同模型绑定姿态(A-pose/T-pose)不同，直接加固定角度
+     会把手臂转进身体里（"胳膊没了"）。这里在加载时实测「肩→手」的
+     绑定方向角 alpha，之后所有手臂姿态都以"目标夹角"描述，
+     实际旋转 θ = 目标角 - alpha —— 任何模型都自然。
    ═══════════════════════════════════════════════════════════ */
 import * as THREE from "three";
 import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
@@ -10,6 +16,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
 (function (root) {
   "use strict";
   const AnAn = (root.AnAn = root.AnAn || {});
+  const DEG = Math.PI / 180;
 
   function smooth(u) { return u * u * (3 - 2 * u); }
   function sample(keys, x) {
@@ -25,102 +32,200 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     }
     return keys[n - 1][1];
   }
+  /* 取到目标角的最短旋转差（处理 ±180° 回绕） */
+  function angleDelta(cur, tgt) {
+    let d = (tgt - cur) % (Math.PI * 2);
+    if (d > Math.PI) d -= Math.PI * 2;
+    if (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
 
-  /* 手臂「下垂」基准（把 T-pose 放下来）：左腕 +z 抬起 / 右腕 -z 抬起 */
-  const REST = { armL: { z: -1.12 }, armR: { z: 1.12 } };
-
-  /* 姿态预设：手臂 z 抬/放、x 前后摆，肘部 z 弯曲（左右镜像） */
-  const ARMS = {
-    down:  { armL: { z: -1.12, x: 0.0 }, armR: { z: 1.12, x: 0.0 }, eL: 0, eR: 0 },
-    open:  { armL: { z: -0.5, x: 0.0 }, armR: { z: 0.5, x: 0.0 }, eL: 0, eR: 0 },
-    up:    { armL: { z: 1.25, x: 0.0 }, armR: { z: -1.25, x: 0.0 }, eL: 0, eR: 0 }
+  /* 手臂姿态：以「相对水平向外」的夹角描述（度）
+     -90° = 自然垂下 / 0° = 水平张开(T) / +90° = 笔直高举 */
+  const ARM_POSE = {
+    down: { deg: -78 },   // 自然垂放
+    open: { deg: -50 },   // 轻轻张开
+    T:    { deg: -4 },    // 平举
+    up:   { deg: 68 },    // 举起
+    high: { deg: 84 }     // 高高举起
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 
-  /* ── 动作库（tracks 用骨骼槽位 a:'x'/'y'/'z'；b:'__root' 表示整体）── */
+  /* ── 动作库 ────────────────────────────────────────────────
+     tracks 三型：{b:骨骼槽, a:'x'|'y'|'z', keys}（弧度，叠加）
+                {arm:'L'|'R', off:[[u,度],…]}（手臂夹角偏移）
+                {m:morph名, keys}（表情）  {b:'__root',a:'x'|'y'|'z'|'ry'|'rz'}（整体） */
   const GEST = {
     idle: { dur: 0.4, tracks: [] },
-    nod: { dur: 1.0, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.22, 0.22], [0.46, 0.02], [0.72, 0.12], [1, 0]] }] },
-    shake: { dur: 1.1, tracks: [
-      { b: "head", a: "y", keys: [[0, 0], [0.2, 0.24], [0.42, -0.24], [0.64, 0.17], [0.84, -0.17], [1, 0]] }] },
-    tilt: { dur: 1.1, tracks: [
-      { b: "head", a: "z", keys: [[0, 0], [0.35, 0.34], [0.78, 0.26], [1, 0]] },
+
+    /* ── 头 / 颈 ── */
+    nod: { dur: 1.0, tracks: [
+      { b: "head", a: "x", keys: [[0, 0], [0.22, 0.30], [0.46, 0.03], [0.72, 0.14], [1, 0]] },
+      { b: "neck", a: "x", keys: [[0, 0], [0.22, 0.10], [1, 0]] }] },
+    nod_small: { dur: 0.8, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.3, 0.16], [0.7, 0.02], [1, 0]] }] },
+    shake: { dur: 1.2, tracks: [
+      { b: "head", a: "y", keys: [[0, 0], [0.2, 0.40], [0.42, -0.40], [0.64, 0.26], [0.84, -0.26], [1, 0]] }] },
+    tilt: { dur: 1.2, tracks: [
+      { b: "head", a: "z", keys: [[0, 0], [0.35, 0.42], [0.8, 0.32], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.4, -0.06], [1, 0]] }] },
-    look_up: { dur: 1.8, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.25, -0.3], [0.72, -0.24], [1, 0]] }] },
-    look_away: { dur: 1.9, tracks: [
-      { b: "head", a: "y", keys: [[0, 0], [0.22, 0.5], [0.74, 0.5], [1, 0]] },
-      { b: "head", a: "z", keys: [[0, 0], [0.26, 0.12], [0.74, 0.12], [1, 0]] }] },
-    turn_left: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, 1.35], [0.7, 1.35], [1, 0]] }] },
-    turn_right: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, -1.35], [0.7, -1.35], [1, 0]] }] },
-    turn_around: { dur: 2.2, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.15, 0.2], [0.85, 6.48], [1, 6.48]] }] },
-    bow: { dur: 2.2, tracks: [
-      { b: "upper", a: "x", keys: [[0, 0], [0.3, 0.5], [0.65, 0.5], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.65, 0.2], [1, 0]] }] },
-    bounce: { dur: 0.95, tracks: [
-      { b: "__root", a: "y", keys: [[0, 0], [0.24, 1.1], [0.5, -0.2], [0.76, 0.5], [1, 0]] },
-      { b: "lower", a: "x", keys: [[0, 0], [0.24, -0.08], [1, 0]] }] },
-    jump: { dur: 1.3, tracks: [
-      { b: "__root", a: "y", keys: [[0, 0], [0.15, -0.3], [0.45, 1.9], [0.72, -0.1], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+    look_up: { dur: 1.8, tracks: [
+      { b: "head", a: "x", keys: [[0, 0], [0.25, -0.50], [0.72, -0.40], [1, 0]] },
+      { b: "neck", a: "x", keys: [[0, 0], [0.25, -0.16], [0.72, -0.12], [1, 0]] }] },
+    look_down: { dur: 1.8, tracks: [
+      { b: "head", a: "x", keys: [[0, 0], [0.25, 0.44], [0.72, 0.34], [1, 0]] },
+      { b: "neck", a: "x", keys: [[0, 0], [0.25, 0.1], [1, 0]] }] },
+    look_left: { dur: 1.8, tracks: [
+      { b: "head", a: "y", keys: [[0, 0], [0.25, 0.74], [0.72, 0.66], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.3, 0.1], [1, 0]] }] },
+    look_right: { dur: 1.8, tracks: [
+      { b: "head", a: "y", keys: [[0, 0], [0.25, -0.74], [0.72, -0.66], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+
+    /* ── 上半身 / 腰 ── */
+    bow: { dur: 2.0, tracks: [
+      { b: "upper", a: "x", keys: [[0, 0], [0.3, 0.72], [0.66, 0.68], [1, 0]] },
+      { b: "lower", a: "x", keys: [[0, 0], [0.3, -0.10], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.66, 0.2], [1, 0]] }] },
+    bow_deep: { dur: 2.4, tracks: [
+      { b: "upper", a: "x", keys: [[0, 0], [0.32, 1.15], [0.72, 1.1], [1, 0]] },
+      { b: "lower", a: "x", keys: [[0, 0], [0.32, -0.16], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.32, 0.34], [0.72, 0.3], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.32, 0.3], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.32, -0.3], [1, 0]] }] },
+    lean_back: { dur: 2.0, tracks: [
+      { b: "upper", a: "x", keys: [[0, 0], [0.3, -0.42], [0.74, -0.36], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.18], [1, 0]] }] },
+    lean_left: { dur: 2.0, tracks: [
+      { b: "__root", a: "rz", keys: [[0, 0], [0.3, 0.16], [0.74, 0.13], [1, 0]] },
+      { b: "upper", a: "z", keys: [[0, 0], [0.3, 0.26], [0.74, 0.22], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.35, -0.16], [1, 0]] }] },
+    lean_right: { dur: 2.0, tracks: [
+      { b: "__root", a: "rz", keys: [[0, 0], [0.3, -0.16], [0.74, -0.13], [1, 0]] },
+      { b: "upper", a: "z", keys: [[0, 0], [0.3, -0.26], [0.74, -0.22], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.35, 0.16], [1, 0]] }] },
+    twist_left: { dur: 2.0, tracks: [
+      { b: "upper", a: "y", keys: [[0, 0], [0.3, 0.62], [0.74, 0.56], [1, 0]] },
+      { b: "lower", a: "y", keys: [[0, 0], [0.3, -0.26], [1, 0]] },
+      { b: "head", a: "y", keys: [[0, 0], [0.3, 0.28], [1, 0]] }] },
+    twist_right: { dur: 2.0, tracks: [
+      { b: "upper", a: "y", keys: [[0, 0], [0.3, -0.62], [0.74, -0.56], [1, 0]] },
+      { b: "lower", a: "y", keys: [[0, 0], [0.3, 0.26], [1, 0]] },
+      { b: "head", a: "y", keys: [[0, 0], [0.3, -0.28], [1, 0]] }] },
     sway: { dur: 4.0, loop: true, tracks: [
-      { b: "__root", a: "rz", keys: [[0, 0], [0.25, 0.05], [0.5, 0], [0.75, -0.05], [1, 0]] },
+      { b: "__root", a: "rz", keys: [[0, 0], [0.25, 0.055], [0.5, 0], [0.75, -0.055], [1, 0]] },
       { b: "upper", a: "z", keys: [[0, 0], [0.25, 0.05], [0.5, 0], [0.75, -0.05], [1, 0]] }] },
-    stretch: { dur: 2.0, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.3, 1.7], [0.8, 1.6], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, -1.7], [0.8, -1.6], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.18], [0.8, -0.12], [1, 0]] }] },
+
+    /* ── 整体：转身 / 位移 / 蹦跳 ── */
+    turn_left: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, 1.5], [0.72, 1.5], [1, 0]] }] },
+    turn_right: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, -1.5], [0.72, -1.5], [1, 0]] }] },
+    turn_around: { dur: 2.4, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.12, 0.2], [0.86, 6.48], [1, 6.48]] }] },
+    spin: { dur: 3.0, loop: true, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [1, 6.2832]] }] },
+    bounce: { dur: 1.0, tracks: [
+      { b: "__root", a: "y", keys: [[0, 0], [0.24, 2.6], [0.5, -0.4], [0.76, 1.1], [1, 0]] },
+      { b: "lower", a: "x", keys: [[0, 0], [0.24, -0.10], [1, 0]] }] },
+    jump: { dur: 1.4, tracks: [
+      { b: "__root", a: "y", keys: [[0, 0], [0.14, -1.2], [0.46, 7.5], [0.72, -0.5], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.14], [1, 0]] },
+      { arm: "L", off: [[0, 0], [0.5, 60], [0.72, 10], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.5, 60], [0.72, 10], [1, 0]] }] },
+    step: { dur: 1.6, tracks: [
+      { b: "__root", a: "x", keys: [[0, 0], [0.4, 2.2], [0.8, 0.2], [1, 0]] },
+      { b: "upper", a: "x", keys: [[0, 0], [0.4, 0.14], [1, 0]] },
+      { b: "legL", a: "x", keys: [[0, 0], [0.35, 0.42], [0.7, -0.1], [1, 0]] },
+      { b: "legR", a: "x", keys: [[0, 0], [0.35, -0.3], [0.7, 0.2], [1, 0]] }] },
+    weight_shift: { dur: 2.6, tracks: [
+      { b: "__root", a: "x", keys: [[0, 0], [0.3, 1.4], [0.7, -1.4], [1, 0]] },
+      { b: "__root", a: "rz", keys: [[0, 0], [0.3, -0.05], [0.7, 0.05], [1, 0]] }] },
+    crouch: { dur: 2.2, tracks: [
+      { b: "__root", a: "y", keys: [[0, 0], [0.3, -4.6], [0.72, -4.2], [1, 0]] },
+      { b: "upper", a: "x", keys: [[0, 0], [0.3, 0.34], [0.72, 0.3], [1, 0]] },
+      { b: "kneeL", a: "x", keys: [[0, 0], [0.3, 0.5], [0.72, 0.46], [1, 0]] },
+      { b: "kneeR", a: "x", keys: [[0, 0], [0.3, 0.5], [0.72, 0.46], [1, 0]] }] },
+    kick: { dur: 1.4, tracks: [
+      { b: "legR", a: "x", keys: [[0, 0], [0.25, -0.9], [0.5, -0.2], [1, 0]] },
+      { b: "legL", a: "x", keys: [[0, 0], [0.25, 0.1], [1, 0]] }] },
+
+    /* ── 手臂 ── */
+    stretch: { dur: 2.2, tracks: [
+      { arm: "L", off: [[0, 0], [0.3, 150], [0.82, 142], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.3, 150], [0.82, 142], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.2], [0.82, -0.14], [1, 0]] }] },
     arm_wave: { dur: 1.8, tracks: [
-      { b: "armR", a: "z", keys: [[0, 0], [0.18, -1.35], [0.4, -1.05], [0.62, -1.35], [0.82, -1.05], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.18, 150], [0.4, 118], [0.62, 150], [0.82, 118], [1, 0]] },
       { m: "smile", keys: [[0, 0], [0.25, 0.7], [0.75, 0.55], [1, 0]] }] },
-    arm_up: { dur: 1.6, tracks: [{ b: "armR", a: "z", keys: [[0, 0], [0.3, -1.6], [0.78, -1.5], [1, 0]] }] },
-    arms_cross: { dur: 2.2, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.35, -0.16], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.35, 0.16], [1, 0]] },
-      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.6], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.6], [1, 0]] }] },
-    hands_on_hips: { dur: 2.2, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.35, -0.4], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.35, 0.4], [1, 0]] },
-      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.55], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.55], [1, 0]] }] },
+    wave_both: { dur: 2.0, tracks: [
+      { arm: "L", off: [[0, 0], [0.22, 158], [0.5, 132], [0.78, 158], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.22, 158], [0.5, 132], [0.78, 158], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.25, 0.85], [0.8, 0.7], [1, 0]] }] },
+    cheer: { dur: 1.8, tracks: [
+      { arm: "L", off: [[0, 0], [0.26, 165], [0.7, 158], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.26, 165], [0.7, 158], [1, 0]] },
+      { b: "__root", a: "y", keys: [[0, 0], [0.3, 2.2], [0.62, 0], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.25, 1], [0.8, 0.85], [1, 0]] }] },
+    arm_up: { dur: 1.6, tracks: [{ arm: "R", off: [[0, 0], [0.3, 155], [0.78, 146], [1, 0]] }] },
     point: { dur: 1.8, tracks: [
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, -0.7], [0.78, -0.65], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.55], [0.78, -0.5], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.3, 92], [0.78, 86], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.5], [0.78, -0.45], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.3, -0.12], [1, 0]] }] },
     peace: { dur: 1.8, tracks: [
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, -1.5], [0.78, -1.42], [1, 0]] },
-      { m: "smile", keys: [[0, 0], [0.3, 0.8], [0.78, 0.7], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.3, 138], [0.78, 130], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.3, 0.85], [0.78, 0.72], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+    salute: { dur: 1.8, tracks: [
+      { arm: "R", off: [[0, 0], [0.3, 118], [0.78, 112], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.6], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.08], [1, 0]] }] },
+    arms_cross: { dur: 2.2, tracks: [
+      { arm: "L", off: [[0, 0], [0.35, -14], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.35, -14], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.95], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.95], [1, 0]] },
+      { b: "elbowL", a: "z", keys: [[0, 0], [0.35, -1.15], [1, 0]] },
+      { b: "elbowR", a: "z", keys: [[0, 0], [0.35, 1.15], [1, 0]] }] },
+    hands_on_hips: { dur: 2.2, tracks: [
+      { arm: "L", off: [[0, 0], [0.35, 16], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.35, 16], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.5], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.5], [1, 0]] },
+      { b: "elbowL", a: "z", keys: [[0, 0], [0.35, -1.05], [1, 0]] },
+      { b: "elbowR", a: "z", keys: [[0, 0], [0.35, 1.05], [1, 0]] }] },
     clap: { dur: 1.5, tracks: [
-      { b: "armL", a: "x", keys: [[0, 0], [0.2, 0.85], [0.4, 0.4], [0.6, 0.85], [0.8, 0.4], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.2, -0.85], [0.4, -0.4], [0.6, -0.85], [0.8, -0.4], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.2, 0.9], [0.4, 0.45], [0.6, 0.9], [0.8, 0.45], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.2, -0.9], [0.4, -0.45], [0.6, -0.9], [0.8, -0.45], [1, 0]] },
       { m: "smile", keys: [[0, 0], [0.3, 0.65], [0.8, 0.55], [1, 0]] }] },
     shrug: { dur: 1.6, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.3, -0.05], [0.78, -0.02], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, 0.05], [0.78, 0.02], [1, 0]] },
+      { arm: "L", off: [[0, 0], [0.3, 6], [0.78, 3], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.3, 6], [0.78, 3], [1, 0]] },
+      { b: "elbowL", a: "z", keys: [[0, 0], [0.3, -0.9], [0.78, -0.85], [1, 0]] },
+      { b: "elbowR", a: "z", keys: [[0, 0], [0.3, 0.9], [0.78, 0.85], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.3, 0.1], [1, 0]] }] },
+
+    /* ── 情绪（含 morph）── */
     shy: { dur: 2.2, tracks: [
       { m: "shy", keys: [[0, 0], [0.3, 0.9], [0.8, 0.75], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.8, 0.16], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.24], [0.8, 0.18], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.4, 0.22], [0.8, 0.16], [1, 0]] },
-      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.5], [0.85, 0.4], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.5], [0.85, -0.4], [1, 0]] }] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.55], [0.85, 0.45], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.55], [0.85, -0.45], [1, 0]] }] },
     think: { dur: 2.6, tracks: [
       { b: "head", a: "z", keys: [[0, 0], [0.4, 0.2], [0.82, 0.15], [1, 0]] },
-      { b: "head", a: "y", keys: [[0, 0], [0.4, -0.15], [0.82, -0.1], [1, 0]] }] },
-    pout: { dur: 1.6, tracks: [{ b: "head", a: "z", keys: [[0, 0], [0.4, -0.12], [1, 0]] }] },
+      { b: "head", a: "y", keys: [[0, 0], [0.4, -0.15], [0.82, -0.1], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.4, 30], [0.82, 26], [1, 0]] },
+      { b: "elbowR", a: "z", keys: [[0, 0], [0.4, 1.0], [0.82, 0.95], [1, 0]] }] },
+    pout: { dur: 1.6, tracks: [{ b: "head", a: "z", keys: [[0, 0], [0.4, -0.12], [1, 0]] }, { m: "angry", keys: [[0, 0], [0.4, 0.35], [1, 0]] }] },
     smile: { dur: 1.8, tracks: [{ m: "smile", keys: [[0, 0], [0.3, 0.9], [0.74, 0.75], [1, 0]] }] },
     laugh: { dur: 1.7, tracks: [
       { m: "smile", keys: [[0, 0], [0.2, 1], [0.85, 1], [1, 0]] },
-      { b: "__root", a: "y", keys: [[0, 0], [0.25, 0.8], [0.5, -0.1], [0.75, 0.5], [1, 0]] }] },
+      { b: "__root", a: "y", keys: [[0, 0], [0.25, 1.6], [0.5, -0.2], [0.75, 0.9], [1, 0]] }] },
     sad: { dur: 2.4, tracks: [
       { m: "sad", keys: [[0, 0], [0.3, 0.9], [0.82, 0.7], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.2], [0.82, 0.14], [1, 0]] }] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.82, 0.16], [1, 0]] }] },
     angry: { dur: 1.6, tracks: [
       { m: "angry", keys: [[0, 0], [0.2, 0.95], [0.78, 0.7], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.15, 0.08], [0.35, -0.08], [0.55, 0.05], [1, 0]] }] },
     surprise: { dur: 1.0, tracks: [
-      { b: "head", a: "x", keys: [[0, 0], [0.12, -0.26], [0.5, -0.1], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.12, -0.28], [0.5, -0.1], [1, 0]] },
+      { b: "__root", a: "y", keys: [[0, 0], [0.15, 0.8], [1, 0]] },
       { m: "surprised", keys: [[0, 0], [0.15, 0.9], [0.55, 0.5], [1, 0]] }] }
   };
 
@@ -139,21 +244,34 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._scale = 1; this._ux = 0; this._uy = 0; this._opacity = 1;
     this._insetTop = 0; this._insetBottom = 0;
     this._acts = []; this._mood = null; this._moodT = 0;
-    this._bones = {}; this._morphs = {}; this._morphObjs = [];
+    this._bones = {}; this._morphs = {}; this._morphObjs = []; this._calib = {};
     this._base = new Map();
     this._speaking = false; this._mouthLevel = 0; this._mouthTarget = 0; this._mouthSimT = 0; this._mouthScale = 1;
     this._posture = { arms: "down", facing: "front" };
-    this._armsCur = { armL: { z: ARMS.down.armL.z, x: ARMS.down.armL.x }, armR: { z: ARMS.down.armR.z, x: ARMS.down.armR.x } };
+    this._armsCur = { L: -1.36, R: 1.36, src: null };
     this._last = 0; this._raf = null;
     this.onProgress(0);
   }
 
+  /* 骨骼匹配：优先精确名，其次前缀，再包含；并避开 IK / 捩 / ダミー / 布线骨骼 */
   MMD3D.prototype._findBone = function (skeleton, keys) {
-    for (let i = 0; i < keys.length; i++) {
-      const k = keys[i];
-      for (let j = 0; j < skeleton.bones.length; j++) if (skeleton.bones[j].name.indexOf(k) !== -1) return skeleton.bones[j];
+    let best = null, bestScore = -1e9;
+    for (let j = 0; j < skeleton.bones.length; j++) {
+      const n = skeleton.bones[j].name;
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        let s;
+        if (n === k) s = 1000 - i * 10;
+        else if (n.indexOf(k) === 0) s = 400 - i * 10;
+        else if (n.indexOf(k) !== -1) s = 200 - i * 10;
+        else continue;
+        if (/[IKＩＫ]/.test(n) && !/[IKＩＫ]/.test(k)) s -= 500;
+        if (/捩|ダミー|dummy|錘|MagicaCloth|Assist|Twist|Adjust|Collider/.test(n)) s -= 320;
+        if (/D$|EX$|先$/.test(n)) s -= 160;
+        if (s > bestScore) { bestScore = s; best = skeleton.bones[j]; }
+      }
     }
-    return null;
+    return best;
   };
 
   MMD3D.prototype.load = async function (def) {
@@ -178,16 +296,24 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     let skinned = null;
     model.traverse(function (o) { if (!skinned && o.isSkinnedMesh) skinned = o; });
     this._skinned = skinned;
-    this._bones = {}; this._base.clear();
+    this._bones = {}; this._base.clear(); this._calib = {};
     if (skinned) {
       const sk = skinned.skeleton;
       for (const slot in AnAn.MMD_BONES) this._bones[slot] = this._findBone(sk, AnAn.MMD_BONES[slot]);
       sk.bones.forEach(function (b) { self._base.set(b, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
-      // 把「自然站姿」并入基准，避免 T-pose
-      for (const slot in REST) {
-        const b = this._bones[slot], r = REST[slot];
-        if (b && this._base.has(b)) { const base = this._base.get(b); base.z += (r.z || 0); base.x += (r.x || 0); base.y += (r.y || 0); }
-      }
+
+      /* ★ 手臂自动校准：实测「肩→手」绑定方向角 */
+      model.updateMatrixWorld(true);
+      const cfg = { L: { arm: "armL", tip: "handL", alt: "elbowL" }, R: { arm: "armR", tip: "handR", alt: "elbowR" } };
+      ["L", "R"].forEach(function (side) {
+        const ab = self._bones[cfg[side].arm];
+        const tb = self._bones[cfg[side].tip] || self._bones[cfg[side].alt];
+        if (!ab || !tb) { self._calib[side] = null; return; }
+        const a = new THREE.Vector3(), t = new THREE.Vector3();
+        ab.getWorldPosition(a); tb.getWorldPosition(t);
+        const v = t.clone().sub(a);
+        self._calib[side] = { alpha: Math.atan2(v.y, v.x), vx: v.x };
+      });
     }
     this._morphs = {}; this._morphObjs = [];
     model.traverse(function (o) {
@@ -210,6 +336,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._pitch = 0.08;
     this._yaw = 0;
     this._applyTransform();
+    this._syncArms(true);
 
     this._ready = true;
     this._visible = true;
@@ -217,6 +344,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._idleT = 3;
     this._startLoop();
     this.onProgress(1);
+    root.__mmd3d = this;   // 调试/测试入口
     return this;
   };
 
@@ -337,6 +465,8 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     else if (mood === "calm") this.playGesture("sway");
     else if (mood === "thinking") this.playGesture("think");
     else if (mood === "shy") this.playGesture("shy");
+    else if (mood === "angry") this.playGesture("arms_cross");
+    else if (mood === "surprised") this.playGesture("surprise");
   };
   MMD3D.prototype.clearMood = function () { this._mood = null; };
   MMD3D.prototype.playGesture = function (name) {
@@ -344,26 +474,26 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     const g = GEST[name];
     if (!g || !g.tracks.length) return false;
     for (let i = 0; i < this._acts.length; i++) if (this._acts[i].name === name) return true;
-    if (this._acts.length >= 2) return true;
+    if (this._acts.length >= 3) return true;
     this._acts.push({ name: name, t: 0, dur: g.dur, tracks: g.tracks });
     return true;
   };
   MMD3D.prototype.stopAll = function () { this._acts.length = 0; this._mood = null; };
 
-  /* 姿态（持续性）：arms=down|open|up|cross|hips, facing=front|left|right|back */
+  /* 姿态（持续性）：arms=down|open|T|up|high, facing=front|left|right|back */
   MMD3D.prototype.setPosture = function (raw) {
     const p = { arms: "down", facing: "front" };
     if (raw) {
       String(raw).split(/[,;]+/).forEach(function (kv) {
         const m = kv.split("="); if (m.length !== 2) return;
-        const k = m[0].trim().toLowerCase(), v = m[1].trim().toLowerCase();
-        if (k === "arms" && ARMS[v]) p.arms = v;
-        if (k === "facing" && FACING[v] != null) p.facing = v;
+        const k = m[0].trim().toLowerCase(), v = m[1].trim();
+        if (k === "arms") { const vv = v.toLowerCase(); if (ARM_POSE[vv]) p.arms = vv; else if (ARM_POSE[v]) p.arms = v; }
+        if (k === "facing" && FACING[v.toLowerCase()] != null) p.facing = v.toLowerCase();
       });
     }
     this._posture = p;
   };
-  MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动，忽略 Live2D 表情名 */ };
+  MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动 */ };
 
   MMD3D.prototype.setIdle = function (on) { this._idleOn = !!on; };
   MMD3D.prototype.setMouthScale = function (s) { this._mouthScale = s || 1; };
@@ -396,36 +526,45 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this._mouthLevel += (this._mouthTarget - this._mouthLevel) * Math.min(1, dt * 16);
 
     this._breath = (this._breath || 0) + dt;
-    // 闲置：慢转 + 不打断手动操作
     if (this._idleOn !== false && this._idleT > 2.5 && this._ptr.size === 0) this._yaw += dt * 0.16;
+    /* 闲置时随机小动作，让角色"自己动起来" */
+    if (this._idleOn !== false && this._idleT > 13 && this._ptr.size === 0) {
+      this._idleT = 0;
+      const pool = ["look_away", "tilt", "look_up", "look_down", "sway", "nod_small", "weight_shift"];
+      this.playGesture(pool[Math.floor(Math.random() * pool.length)]);
+    }
 
     this._drive(dt);
     this._render();
+  };
+
+  /* 依据当前姿态 + 校准，算出左右臂应加的 z 旋转（弧度） */
+  MMD3D.prototype._armTarget = function (side, posture, offDeg) {
+    const base = ARM_POSE[posture] || ARM_POSE.down;
+    const calib = this._calib[side];
+    const deg = base.deg + (offDeg || 0);
+    if (!calib) {
+      /* 无校准信息：退化为直接旋转（左 -/右 + 下垂方向） */
+      const th = deg * DEG;
+      return side === "L" ? th : -th;
+    }
+    return deg * DEG - calib.alpha;
+  };
+  MMD3D.prototype._syncArms = function (instant) {
+    ["L", "R"].forEach(function (side) {
+      const th = this._armTarget(side, this._posture.arms, 0);
+      if (instant) this._armsCur[side] = th;
+    }, this);
   };
 
   MMD3D.prototype._drive = function (dt) {
     const self = this;
     this._base.forEach(function (v, b) { b.rotation.x = v.x; b.rotation.y = v.y; b.rotation.z = v.z; });
 
-    const rootD = { y: 0, ry: 0, rz: 0 };
+    const rootD = { x: 0, y: 0, z: 0, ry: 0, rz: 0 };
     const morphAcc = {};
+    const armOff = { L: 0, R: 0 };
     const addBone = function (slot, axis, v) { const b = self._bones[slot]; if (b) b.rotation[axis] += v; };
-
-    // 姿态：手臂平滑过渡到目标
-    const tgt = ARMS[this._posture.arms] || ARMS.down;
-    const k = Math.min(1, dt * 6);
-    ["armL", "armR"].forEach(function (s) {
-      self._armsCur[s].z += (tgt[s].z - self._armsCur[s].z) * k;
-      self._armsCur[s].x += (tgt[s].x - self._armsCur[s].x) * k;
-    });
-    self._armsCur.eL += ((tgt.eL || 0) - self._armsCur.eL) * k;
-    self._armsCur.eR += ((tgt.eR || 0) - self._armsCur.eR) * k;
-
-    // 情绪 morph
-    if (this._mood != null && this._morphs[this._mood]) {
-      this._moodT += dt;
-      morphAcc[this._mood] = (morphAcc[this._mood] || 0) + ((this._mood === "smile") ? 0.5 : 0.68) * Math.min(1, this._moodT * 2);
-    }
 
     // 动作
     for (let i = this._acts.length - 1; i >= 0; i--) {
@@ -437,16 +576,26 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
         const tr = a.tracks[j];
         const val = sample(tr.keys, u);
         if (tr.m) morphAcc[tr.m] = (morphAcc[tr.m] || 0) + val;
-        else if (tr.b === "__root") rootD[tr.a] += val;
+        else if (tr.arm) armOff[tr.arm] += val;
+        else if (tr.b === "__root") rootD[tr.a] = (rootD[tr.a] || 0) + val;
         else addBone(tr.b, tr.a, val);
       }
     }
 
-    // 姿态手臂（在动作之后叠加，动作优先级更高的偏移仍生效）
-    addBone("armL", "z", this._armsCur.armL.z - REST.armL.z);
-    addBone("armR", "z", this._armsCur.armR.z - REST.armR.z);
-    addBone("armL", "x", this._armsCur.armL.x);
-    addBone("armR", "x", this._armsCur.armR.x);
+    // 手臂：平滑到「姿态角 + 动作偏移」，消除换模型的畸形
+    const k = Math.min(1, dt * 7);
+    ["L", "R"].forEach(function (side) {
+      const th = self._armTarget(side, self._posture.arms, armOff[side]);
+      self._armsCur[side] += angleDelta(self._armsCur[side], th) * k;
+    });
+    addBone("armL", "z", this._armsCur.L);
+    addBone("armR", "z", this._armsCur.R);
+
+    // 情绪 morph
+    if (this._mood != null && this._morphs[this._mood]) {
+      this._moodT += dt;
+      morphAcc[this._mood] = (morphAcc[this._mood] || 0) + ((this._mood === "smile") ? 0.5 : 0.68) * Math.min(1, this._moodT * 2);
+    }
 
     // 待机微动作
     if (this._idleOn !== false) {
@@ -455,19 +604,20 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       addBone("head", "y", Math.sin(t * 0.7) * 0.02);
       addBone("head", "x", Math.sin(t * 1.1) * 0.012);
       addBone("lower", "z", Math.sin(t * 0.9) * 0.02);
-      rootD.y += Math.sin(t * 1.6) * 0.05;
+      rootD.y += Math.sin(t * 1.6) * 0.06;
     }
 
     // 整体
     if (this._model) {
       const H = this._modelH || 20;
+      const u = H * 0.02;   // 单位化：1 ≈ 模型高度的 2%
       const facing = FACING[this._posture.facing] || 0;
-      this._model.position.set(this._ux * H * 0.35, (this._uy * H * 0.25) + rootD.y * H * 0.01, 0);
-      this._model.rotation.y = facing + rootD.ry;
-      this._model.rotation.z = rootD.rz;
+      this._model.position.set(this._ux * H * 0.35 + (rootD.x || 0) * u, (this._uy * H * 0.25) + (rootD.y || 0) * u, (rootD.z || 0) * u);
+      this._model.rotation.y = facing + (rootD.ry || 0);
+      this._model.rotation.z = rootD.rz || 0;
     }
 
-    // morph
+    // morph 清零 + 应用
     for (let i = 0; i < this._morphObjs.length; i++) {
       const infl = this._morphObjs[i].morphTargetInfluences;
       for (let j = 0; j < infl.length; j++) infl[j] = 0;
@@ -510,7 +660,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       v.project(cam);
       const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
       this._headScreen = { x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H };
-      // 头部锚点变化时通知外层重新摆放气泡（带节流）
       const now = performance.now();
       if (this._anchorY == null || Math.abs(this._anchorY - this._headScreen.y) > 2) {
         this._anchorY = this._headScreen.y;
@@ -521,5 +670,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
 
   AnAn.MMD3D = MMD3D;
   AnAn.MMD3D.GESTURES = GEST;
+  AnAn.MMD3D.ARM_POSE = ARM_POSE;
   root.__mmdModuleReady = true;
 })(window);

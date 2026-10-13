@@ -22,15 +22,19 @@
 
   /* ───────── 3D（MMD）动作 / 姿态 ───────── */
   AnAn.MMD_ACTS_CN = {
-    nod: "点头", shake: "摇头", tilt: "歪头", look_up: "抬头", look_away: "移开视线",
-    turn_left: "向左转身", turn_right: "向右转身", turn_around: "转一圈", bow: "鞠躬",
-    bounce: "轻蹦", jump: "跳一下", sway: "轻轻摇摆", stretch: "伸懒腰",
-    arm_wave: "挥手", arm_up: "举手", arms_cross: "抱臂", hands_on_hips: "叉腰",
-    point: "指一下", peace: "比耶", clap: "拍手", shrug: "耸肩",
+    nod: "点头", nod_small: "轻轻点头", shake: "摇头", tilt: "歪头",
+    look_up: "抬头", look_down: "低头", look_left: "向左看", look_right: "向右看", look_away: "移开视线",
+    bow: "鞠躬", bow_deep: "深鞠躬", lean_back: "向后仰", lean_left: "向左倾身", lean_right: "向右倾身",
+    twist_left: "向左扭腰", twist_right: "向右扭腰",
+    turn_left: "向左转身", turn_right: "向右转身", turn_around: "原地转一圈", spin: "原地旋转",
+    bounce: "轻蹦", jump: "跳一下", step: "迈一步", weight_shift: "重心左右移动", crouch: "蹲下", kick: "踢腿",
+    stretch: "伸懒腰", arm_wave: "挥手", wave_both: "双手挥手", cheer: "欢呼", arm_up: "举手",
+    point: "指一下", peace: "比耶", salute: "敬礼", arms_cross: "抱臂", hands_on_hips: "叉腰",
+    clap: "拍手", shrug: "耸肩", sway: "轻轻摇摆",
     shy: "害羞", think: "思考", pout: "嘟嘴", smile: "微笑", laugh: "笑",
     sad: "失落", angry: "生气", surprise: "吃惊"
   };
-  AnAn.MMD_ARMS = { down: "自然垂放", open: "轻轻张开", up: "举起" };
+  AnAn.MMD_ARMS = { down: "自然垂放", open: "轻轻张开", T: "平举", up: "举起", high: "高高举起" };
   AnAn.MMD_FACING = { front: "正面", left: "侧向左", right: "侧向右", back: "背向" };
 
   /* ───────── 安An 的内置表情/道具姿势（exp3）───────── */
@@ -91,6 +95,50 @@
         "啊…你来啦。快进来坐吧～",
         "唔…我刚刚还在这儿发呆呢。你想聊点什么？",
         "欢迎回来～宿舍里正好有点安静。"
+      ]
+    },
+    {
+      id: "fu",
+      kind: "mmd",
+      name: "芙宁娜",
+      tag: "3D · 水之国",
+      model: "assets/model/fu/fu.pmx",
+      textures: [],
+      poses: [],
+      scale: 1.0,
+      offsetY: 0,
+      mouthScale: 1.0,
+      persona:
+        "你是「芙宁娜」，一位举止优雅、带点小骄傲却心地柔软的少女。\n" +
+        "性格：自信、俏皮、爱演一点小戏，其实很在乎别人；说话轻快、有起伏，一般 1~3 句，不要长篇大论。\n" +
+        "你拥有一具可以自由活动的 3D 身体，会用自然的肢体动作与表情配合说话。\n" +
+        "称呼用户为「你」。不要自称 AI 或程序，就像真实存在的小伙伴一样聊天。用简体中文回答。",
+      greeting: [
+        "哦～你来啦？本芙宁娜可是等了你好一会儿呢。",
+        "哼哼，今天由本芙宁娜来陪你，可不许无聊哟～",
+        "欢迎欢迎～要不要坐下，听我说点有趣的事？"
+      ]
+    },
+    {
+      id: "star",
+      kind: "mmd",
+      name: "星临者",
+      tag: "3D · 绮夜誓仪",
+      model: "assets/model/star/star.pmx",
+      textures: [],
+      poses: [],
+      scale: 1.0,
+      offsetY: 0,
+      mouthScale: 1.0,
+      persona:
+        "你是「星临者·绮夜誓仪」，来自星海彼端的优雅誓约者，沉静、可靠、带一点点神秘。\n" +
+        "性格：从容、温柔、思路清晰，偶尔流露一点俏皮；说话简洁有礼，一般 1~3 句，不要长篇大论。\n" +
+        "你拥有一具可以自由活动的 3D 身体，会用自然的肢体动作与表情配合说话。\n" +
+        "称呼用户为「你」。不要自称 AI 或程序，就像真实存在的小伙伴一样聊天。用简体中文回答。",
+      greeting: [
+        "星轨把我们连在一起了……你来了，真好。",
+        "你好。愿今夜的星光照亮你的心情。",
+        "稍等片刻……好了，现在我可以专心陪你了。"
       ]
     }
   ];
@@ -170,7 +218,13 @@
     shoulderL: ["左肩"],
     shoulderR: ["右肩"],
     legL: ["左足"],
-    legR: ["右足"]
+    legR: ["右足"],
+    kneeL: ["左ひざ", "左膝", "kneeL"],
+    kneeR: ["右ひざ", "右膝", "kneeR"],
+    footL: ["左足首", "footL"],
+    footR: ["右足首", "footR"],
+    handL: ["左手首", "hand_L", "handL"],
+    handR: ["右手首", "hand_R", "handR"]
   };
   AnAn.MMD_MORPHS = {
     blink: ["まばたき", "瞬き", "blink"],
@@ -198,7 +252,13 @@
       const arms = Object.keys(AnAn.MMD_ARMS).map(function (k) { return k + " " + AnAn.MMD_ARMS[k]; }).join(" / ");
       const facing = Object.keys(AnAn.MMD_FACING).map(function (k) { return k + " " + AnAn.MMD_FACING[k]; }).join(" / ");
       return head +
-        "你控制的是一具完整的 3D 身体：能转头、抬/低头、可 360° 转身、抬臂挥手、叉腰、抱臂、鞠躬、蹦跳、伸懒腰、鼓掌……请让它像真人一样自然地动。\n" +
+        "你控制的是一具完整的 3D 身体（头、颈、上半身、腰、手臂、双腿、以及整个身体），能做出真人级的动作：" +
+        "抬头/低头/左右转头/点头/摇头/歪头，鞠躬（含深鞠躬）、前倾后仰、左右倾身、扭腰，向左向右转身、原地转一圈甚至原地旋转，" +
+        "迈步、踢腿、下蹲、蹦跳，伸懒腰、挥手/双手挥手、欢呼、举手、指、比耶、敬礼，抱臂、叉腰、拍手、耸肩，" +
+        "以及害羞、思考、撒娇、失落、生气等情绪动作。幅度都足够大，请大胆使用。\n" +
+        "★ 你要根据对话的情绪与场景，主动地、灵活地驱动这具身体：开心就 cheer/bounce/wave_both，认同就 nod，" +
+        "害羞就 shy，思考就 think，吃惊就 surprise，道别就 arm_wave/turn_around……让它像真人一样自然而有生气。" +
+        "情绪平淡时可以只做很小的动作或不加标签。\n" +
         "① 情绪 / 动作（放在回复最开头、单独一行，最多一行）：\n<mood>情绪</mood><act>动作</act>\n" +
         moodLine +
         "· act（最多 2 个，用逗号分隔）：" + acts + "\n" +
@@ -208,7 +268,7 @@
         "例如 <pose>arms=cross,facing=left</pose> 表示抱着手臂、侧身朝左；平时不要随便改姿态，只在真的需要时使用。\n" +
         "③ 多条气泡（可选）：想把回复像真人一样一句一句分成多个气泡，用反斜杠 \\ 分隔。\n" +
         rules +
-        "示例：\n<mood>happy</mood><act>arm_wave,smile</act>\n嗨～你来啦！\\今天想和我聊点什么呀？";
+        "示例：\n<mood>happy</mood><act>cheer,smile</act>\n嗨～你来啦！\\今天想和我聊点什么呀？";
     }
 
     // Live2D
