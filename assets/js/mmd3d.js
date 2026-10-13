@@ -511,6 +511,12 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       v.project(cam);
       const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
       this._headScreen = { x: (v.x * 0.5 + 0.5) * W, y: (-v.y * 0.5 + 0.5) * H };
+      // 头部锚点变化时通知外层重新摆放气泡（带节流）
+      const now = performance.now();
+      if (this._anchorY == null || Math.abs(this._anchorY - this._headScreen.y) > 2) {
+        this._anchorY = this._headScreen.y;
+        if (!this._anchorT || now - this._anchorT > 120) { this._anchorT = now; this.onAnchor(); }
+      }
     }
   };
 
