@@ -151,7 +151,7 @@ try {
   diag.mmdModelId = await dp.evaluate(() => window.__ananModelId);
   diag.mmdState = await dp.evaluate(() => {
     try {
-      const c = document.getElementById("3d-canvas");
+      const c = document.getElementById("canvas3d");
       return { ready: window.__anan.mmd._ready, vis: !c.hidden, w: c.width, h: c.height, modelH: Math.round(window.__anan.mmd._modelH || 0), hasHead: !!window.__anan.mmd._bones.head, morphObjs: (window.__anan.mmd._morphObjs || []).length };
     } catch (e) { return { err: String((e && e.message) || e) }; }
   });

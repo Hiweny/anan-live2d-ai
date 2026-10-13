@@ -348,7 +348,7 @@
   function ensureAvatar(def) {
     if (def.kind === "mmd") {
       if (!AnAn.MMD3D) throw new Error("3D 模块尚未加载完成，请刷新页面重试");
-      if (!state.mmd) state.mmd = new AnAn.MMD3D({ canvas: $("3d-canvas"), onProgress: onProgress, onHit: onHit });
+      if (!state.mmd) state.mmd = new AnAn.MMD3D({ canvas: $("canvas3d"), onProgress: onProgress, onHit: onHit });
       if (state.live2d) state.live2d.hide();
       state.mmd.show();
       return state.mmd;
