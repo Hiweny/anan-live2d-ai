@@ -267,10 +267,12 @@
         "· facing：" + facing + "\n" +
         "例如 <pose>arms=cross,facing=left</pose> 表示抱着手臂、侧身朝左；平时不要随便改姿态，只在真的需要时使用。\n" +
         "③ 精细骨骼（可选·进阶：让你自由摆出任意姿势、真正接管身体）：\n<bones>骨骼 动作 方向 角度; …</bones>\n" +
-        "· 可写多句、用分号分隔；同一骨骼可在一句内用逗号叠动作。\n" +
-        "· 骨骼：head 头 / neck 颈 / upper_body 上半身 / lower_body 腰 / center 整体位移 / arm_l·arm_r 大臂 / elbow_l·elbow_r 小臂 / wrist_l·wrist_r 手腕 / leg_l·leg_r 大腿 / knee_l·knee_r 膝盖 / ankle_l·ankle_r 脚踝。\n" +
-        "· 动作：bend 弯 / turn·rotate 转 / sway 侧摆 / raise 抬(手臂) / move 位移；方向：forward 前 / backward 后 / left 左 / right 右 / up 上 / down 下；角度为度数(0~120)。\n" +
-        "· 例：<bones>arm_r bend forward 40; head turn left 20; leg_l bend forward 25</bones>\n" +
+        "· 可写多句（分号分隔）；同一骨骼可在一句内用逗号叠动作，如 head turn left 30, bend forward 20。\n" +
+        "· 骨骼：head 头 / neck 颈 / upper_body 上半身 / waist·lower_body 腰 / center·base 整体位移 / arm_l·arm_r 大臂 / elbow_l·elbow_r 小臂 / wrist_l·wrist_r 手腕 / leg_l·leg_r 大腿 / knee_l·knee_r 膝盖 / ankle_l·ankle_r 脚踝。\n" +
+        "· 动作与允许方向（务必按此搭配）：bend 只配 forward/backward；turn 只配 left/right；sway 只配 left/right；move 只配 forward/backward/left/right/up/down（仅 center/base 可用）。\n" +
+        "· 抬放手臂：arm_l/arm_r 用 raise up（抬）/ raise down（放），或 bend backward（抬）/ bend forward（放）；elbow 只能 bend forward。\n" +
+        "· 角度为度数：头约 0~60、腿约 0~90、躯干/整体 0~90；手臂 raise 是相对自然垂放的抬升量（90≈抬到水平，150≈举过头顶）。\n" +
+        "· 例：<bones>arm_r raise up 150; head turn left 25; leg_l bend forward 30; knee_r bend backward 60</bones>\n" +
         "· 只在需要精细/特别姿势时用它，普通对话用上面的 act 即可。\n" +
         "④ 多条气泡（可选）：想把回复像真人一样一句一句分成多个气泡，用反斜杠 \\ 分隔。\n" +
         rules +

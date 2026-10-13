@@ -191,19 +191,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.6], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.3, -0.08], [1, 0]] }] },
     arms_cross: { dur: 2.2, tracks: [
-      { arm: "L", off: [[0, 0], [0.35, -14], [1, 0]] },
-      { arm: "R", off: [[0, 0], [0.35, -14], [1, 0]] },
-      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.95], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.95], [1, 0]] },
-      { b: "elbowL", a: "z", keys: [[0, 0], [0.35, -1.15], [1, 0]] },
-      { b: "elbowR", a: "z", keys: [[0, 0], [0.35, 1.15], [1, 0]] }] },
+      { arm: "L", off: [[0, 0], [0.35, 34], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.35, 34], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 1.0], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -1.0], [1, 0]] }] },
     hands_on_hips: { dur: 2.2, tracks: [
-      { arm: "L", off: [[0, 0], [0.35, 16], [1, 0]] },
-      { arm: "R", off: [[0, 0], [0.35, 16], [1, 0]] },
-      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.5], [1, 0]] },
-      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.5], [1, 0]] },
-      { b: "elbowL", a: "z", keys: [[0, 0], [0.35, -1.05], [1, 0]] },
-      { b: "elbowR", a: "z", keys: [[0, 0], [0.35, 1.05], [1, 0]] }] },
+      { arm: "L", off: [[0, 0], [0.35, 20], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.35, 20], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.45], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.45], [1, 0]] }] },
     clap: { dur: 1.5, tracks: [
       { b: "armL", a: "x", keys: [[0, 0], [0.2, 0.9], [0.4, 0.45], [0.6, 0.9], [0.8, 0.45], [1, 0]] },
       { b: "armR", a: "x", keys: [[0, 0], [0.2, -0.9], [0.4, -0.45], [0.6, -0.9], [0.8, -0.45], [1, 0]] },
@@ -637,13 +633,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
         else if (d === "backward" || d === "back") rootD.z += v; else if (d === "forward" || d === "front") rootD.z -= v;
         continue;
       }
-      if ((slot === "armL" || slot === "armR") && (act === "raise" || act === "lift")) {
-        armOff[slot === "armL" ? "L" : "R"] += (it.dir === "down" ? -Math.abs(amt) : Math.abs(amt));
+      const isArm = (slot === "armL" || slot === "armR");
+      if (isArm && (act === "raise" || act === "lift" || act === "bend")) {
+        /* 手臂：bend backward / raise up = 抬臂；bend forward / raise down = 放下（沿用语义） */
+        const up = (it.dir === "up" || it.dir === "backward" || it.dir === "back");
+        armOff[slot === "armL" ? "L" : "R"] += up ? Math.abs(amt) : -Math.abs(amt);
         continue;
       }
       const axis = MPL_AXIS[act];
       if (axis) addBone(slot, axis, sgn * amt * DEG);
-      else if (slot === "armL" || slot === "armR") addBone(slot, "x", sgn * amt * DEG);
     }
 
     // 手臂：平滑到「姿态角 + 动作偏移」，消除换模型的畸形
