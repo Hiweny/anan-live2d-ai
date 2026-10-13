@@ -2,31 +2,44 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
-<meta name="theme-color" content="#f7d7e6" />
-<meta name="color-scheme" content="light dark" />
-<title>安An · AI 伙伴</title>
-<meta name="description" content="由 AI 驱动的 Live2D 智能伙伴——会说话、会思考、会做表情。" />
-<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
-<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
-<link rel="manifest" href="assets/site.webmanifest" />
-<link rel="stylesheet" href="assets/css/style.css" />
 <script>
-/* 预渲染主题：在任何绘制之前确定明暗，避免深色模式白闪 */
+/* 预渲染主题：必须是 head 里第一段脚本，在任何 CSS/绘制之前定好明暗，避免深色白闪 */
 (function () {
   try {
     var s = JSON.parse(localStorage.getItem("anan.settings.v2") || "{}");
     var t = s.theme || "auto";
     var dark = t === "dark" || (t === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
     var h = document.documentElement;
-    h.classList.add(dark ? "theme-dark" : "theme-light");
+    h.className = dark ? "theme-dark" : "theme-light";
     h.style.backgroundColor = dark ? "#12101c" : "#f4eefb";
     h.style.colorScheme = dark ? "dark" : "light";
-    var m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute("content", dark ? "#12101c" : "#f7d7e6");
+    window.__earlyDark = dark;
+    var head = document.head || document.getElementsByTagName("head")[0];
+    var m = document.createElement("meta");
+    m.setAttribute("name", "theme-color");
+    m.setAttribute("content", dark ? "#12101c" : "#f7d7e6");
+    if (head) head.appendChild(m);
   } catch (e) {}
 })();
+</script>
+<style>
+html{background:#f4eefb}html.theme-dark{background:#12101c}
+html,body{height:100%;margin:0}
+#loading{position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;background:rgba(250,246,255,.6)}
+html.theme-dark #loading{background:rgba(14,12,24,.6)}
+</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#f7d7e6" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#12101c" media="(prefers-color-scheme: dark)" />
+<title>安An · AI 伙伴</title>
+<meta name="description" content="由 AI 驱动的 Live2D / 3D 智能伙伴——会说话、会思考、会做表情、能动起来。" />
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+<link rel="manifest" href="assets/site.webmanifest" />
+<link rel="stylesheet" href="assets/css/style.css" />
+<script type="importmap">
+{ "imports": { "three": "./assets/js/lib/three/three.module.min.js" } }
 </script>
 </head>
 <body>
@@ -45,9 +58,9 @@
       <span class="brand-tag" id="brandTag">活泼少女</span>
     </div>
     <div class="bar-actions">
-      <button class="icon-btn" id="btnMute" title="静音 / 开启语音" aria-pressed="false">
-        <svg viewBox="0 0 24 24" class="ic-sound"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <svg viewBox="0 0 24 24" class="ic-mute" hidden><path d="M11 5 6 9H3v6h3l5 4V5z"/><line x1="16" y1="9" x2="21" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <button class="icon-btn" id="btnMute" title="开启 / 关闭语音" aria-pressed="false">
+        <svg viewBox="0 0 24 24" class="ic-sound" hidden><path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M16 8a5 5 0 0 1 0 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5a9 9 0 0 1 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg viewBox="0 0 24 24" class="ic-mute"><path d="M11 5 6 9H3v6h3l5 4V5z"/><line x1="16" y1="9" x2="21" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <button class="icon-btn" id="btnSettings" title="设置">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
@@ -57,6 +70,8 @@
 
   <div id="stage">
     <canvas id="live2d-canvas"></canvas>
+    <canvas id="3d-canvas" hidden></canvas>
+    <div id="stageHint" class="stage-hint" hidden>拖动旋转 · 滚轮缩放 · 双指缩放</div>
     <div id="bubbleStack" aria-live="polite"></div>
   </div>
 
@@ -112,7 +127,7 @@
 
       <section class="tab-page" data-page="model" hidden>
         <div class="model-cards" id="modelCards"></div>
-        <p class="field-tip">切换模型后，会同时切换她的人设与记忆（各自独立保存）。</p>
+        <p class="field-tip">切换模型会同时切换她的人设与记忆（各自独立保存）。3D 模型可用鼠标 / 手指拖动旋转、滚轮或双指缩放。</p>
         <label class="field">
           <span class="field-label">缩放微调</span>
           <input type="range" id="setModelScale" min="0.5" max="1.6" step="0.02" /><output id="outModelScale"></output>
@@ -126,7 +141,7 @@
         <label class="field"><span class="field-label">不透明度</span>
           <input type="range" id="setModelOpacity" min="0.2" max="1" step="0.02" /><output id="outModelOpacity"></output></label>
         <label class="field-switch"><input type="checkbox" id="setGaze" /><span>视线跟随鼠标</span></label>
-        <label class="field-switch"><input type="checkbox" id="setIdleMotion" /><span>待机小动作（呼吸、张望）</span></label>
+        <label class="field-switch"><input type="checkbox" id="setIdleMotion" /><span>待机小动作（呼吸、张望、轻微摆动）</span></label>
         <label class="field"><span class="field-label">张口幅度</span>
           <input type="range" id="setMouthScale" min="0.2" max="2" step="0.05" /><output id="outMouthScale"></output></label>
         <div class="field-actions">
@@ -150,7 +165,7 @@
         </div>
         <label class="field-switch"><input type="checkbox" id="setStream" /><span>流式输出（更快，但不会逐字打出来）</span></label>
         <label class="field-switch"><input type="checkbox" id="setReasoning" /><span>在思考气泡里显示模型的推理过程</span></label>
-        <label class="field-switch"><input type="checkbox" id="setAutoTags" /><span>自动附加「身体/动作控制」说明（让 AI 驱动动作）</span></label>
+        <label class="field-switch"><input type="checkbox" id="setAutoTags" /><span>自动附加「身体 / 动作控制」说明（让 AI 驱动动作）</span></label>
         <div class="field-actions">
           <button class="btn" id="btnTestApi">测试连接</button>
           <span class="test-result" id="apiTestResult"></span>
@@ -184,19 +199,15 @@
 
       <section class="tab-page" data-page="tts" hidden>
         <label class="field-switch"><input type="checkbox" id="setTtsEnabled" /><span>开启语音（她开口说话）</span></label>
+        <p class="field-tip">默认关闭语音。也可以直接点右上角的喇叭按钮随时开 / 关。</p>
         <label class="field"><span class="field-label">语音引擎</span>
           <select id="setTtsEngine">
-            <option value="edge">微软 Edge TTS（免费·尝试优先）</option>
-            <option value="webspeech">浏览器内置语音（稳定·推荐）</option>
+            <option value="webspeech">浏览器内置语音（稳定 · 推荐）</option>
             <option value="openai">OpenAI 兼容 /audio/speech</option>
           </select></label>
-        <div class="tts-engine-block" data-engine="edge">
-          <label class="field"><span class="field-label">音色</span><select id="setEdgeVoice"></select></label>
-          <p class="field-tip">微软该接口近期常被限制，连不上时会自动改用浏览器内置语音（在 Edge/Windows 上用的是同一批微软神经音色）。</p>
-        </div>
-        <div class="tts-engine-block" data-engine="webspeech" hidden>
+        <div class="tts-engine-block" data-engine="webspeech">
           <label class="field"><span class="field-label">系统音色</span><select id="setWebSpeechVoice"></select></label>
-          <p class="field-tip">浏览器内置语音离线可用；会自动挑选系统里最好的中文神经音色。</p>
+          <p class="field-tip">浏览器内置语音离线可用；会自动挑选系统里最好的中文神经音色（在 Edge / Windows 上即微软神经音色）。</p>
         </div>
         <div class="tts-engine-block" data-engine="openai" hidden>
           <label class="field"><span class="field-label">TTS 模型</span><input type="text" id="setOpenaiTtsModel" placeholder="tts-1 / gpt-4o-mini-tts" /></label>
@@ -224,16 +235,16 @@
 
       <section class="tab-page" data-page="about" hidden>
         <div class="about-card">
-          <h3>安An / 薇儿 · AI 伙伴</h3>
-          <p>纯前端的 Live2D 智能伙伴：上半部分是她的身体，下半部分是你的交流窗口。她由你提供的 OpenAI 兼容大模型驱动，用气泡回话与思考，并用全身的表情与动作回应你。</p>
+          <h3>安An · 薇儿 · 薄荷 · AI 伙伴</h3>
+          <p>纯前端的智能伙伴：上半部分是她的身体（Live2D 或 3D），下半部分是你的交流窗口。她由你提供的 OpenAI 兼容大模型驱动，用气泡回话与思考，并用全身的表情与动作回应你。</p>
         </div>
         <div class="about-card">
           <h4>她能动什么？</h4>
-          <p>动到什么程度，取决于模型本身的"绑定"（有哪些参数、范围多大）；而"怎么动"由程序与 AI 决定。本项目用自研动作引擎实时驱动头部/身体/眼睛/眉毛/嘴/脸颊/手臂等参数，并把动作控制权交给 AI。</p>
+          <p>动到什么程度，取决于模型本身的「绑定」（有哪些参数、范围多大）；而「怎么动」由程序与 AI 决定。本项目用自研动作引擎实时驱动头部 / 身体 / 眼睛 / 眉毛 / 嘴 / 脸颊 / 手臂等参数，并把动作控制权交给 AI。3D 模型还支持拖动旋转、缩放。</p>
         </div>
         <div class="about-card">
           <h4>模型版权</h4>
-          <p>「安An」为《魔法少女的魔女审判》二次创作同人模型（B 站 @万童Official / @断夏Official 出品，完全免费）。请勿用于商业用途，感谢原作者！</p>
+          <p>「安An」为《魔法少女的魔女审判》二次创作同人模型（B 站 @万童Official / @断夏Official 出品，完全免费）。「薇儿」「薄荷」为第三方免费模型，请勿用于商业用途，感谢原作者！</p>
         </div>
         <div class="field-actions"><a class="btn ghost" href="https://yamawamandou.booth.pm/" target="_blank" rel="noopener">作者 BOOTH 主页</a></div>
       </section>
@@ -251,5 +262,6 @@
 <script src="assets/js/llm.js"></script>
 <script src="assets/js/live2d.js"></script>
 <script src="assets/js/app.js"></script>
+<script type="module" src="assets/js/mmd3d.js"></script>
 </body>
 </html>

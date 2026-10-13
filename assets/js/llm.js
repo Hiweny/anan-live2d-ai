@@ -80,8 +80,15 @@
     // 6) 代码围栏（模型偶尔包裹标签）
     s = s.replace(/^\s*```[a-z]*\s*$/gim, "");
 
-    s = s.replace(/^[\s\n]+/, "").replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/gm, "");
-    return { clean: s.trim(), mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2) };
+    s = s.replace(/^[\s\n]+/, "").replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/gm, "").trim();
+    // 显式多气泡：用反斜杠 \（或全角 ＼）分隔，每段会成为一个独立气泡
+    let parts = null;
+    if (/[\\＼]/.test(s)) {
+      const seg = s.split(/[\\＼]+/).map(function (x) { return x.replace(/[ \t]+$/gm, "").trim(); }).filter(Boolean);
+      if (seg.length > 1) parts = seg;
+    }
+    const clean = parts ? parts.join("\n") : s;
+    return { clean: clean, parts: parts, mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2) };
   };
 
   AnAn.guessMood = function (text) {

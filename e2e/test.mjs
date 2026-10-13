@@ -1,4 +1,4 @@
-// e2e/test.mjs v2 — 桌面端 + 移动端 + 深色模式 的真实浏览器验证
+// e2e/test.mjs v3 — 桌面端 + 移动端 + 深色模式 + 3D 的真实浏览器验证
 import { chromium } from "playwright";
 import fs from "fs";
 
@@ -33,12 +33,12 @@ function makeCtx(opts, extra) {
   });
 }
 
-const shot = (page, name) => page.screenshot({ path: `${outDir}/${tag}-${name}.jpg`, type: "jpeg", quality: 70 });
+const shot = (page, name) => page.screenshot({ path: `${outDir}/${tag}-${name}.jpg`, type: "jpeg", quality: 68 });
 const clickEval = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (el) el.click(); }, sel);
 
 async function waitReady(page, id) {
-  await page.waitForFunction((want) => window.AnAn && window.AnAn.__ready === true && (!want || window.__ananModelId === want), id || null, { timeout: 150000 });
-  await page.waitForFunction(() => window.__ananLoading === false, { timeout: 150000 }).catch(() => {});
+  await page.waitForFunction((want) => window.AnAn && window.AnAn.__ready === true && (!want || window.__ananModelId === want), id || null, { timeout: 180000 });
+  await page.waitForFunction(() => window.__ananLoading === false, { timeout: 180000 }).catch(() => {});
 }
 
 try {
@@ -48,27 +48,43 @@ try {
   await dp.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
   await waitReady(dp);
   diag.steps.push("desktop-ready");
-  await dp.waitForTimeout(1200);
+  await dp.waitForTimeout(1500);
   await shot(dp, "d1-loaded");
 
   diag.paramCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
-  diag.paramError = await dp.evaluate(() => window.__anan.live2d.paramError || null);
   diag.modelBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), vw: innerWidth, vh: innerHeight }; });
 
+  /* — 关键修复：顶栏按钮必须可被真实点击（命中测试）— */
+  diag.hit = await dp.evaluate(() => {
+    const at = (sel) => {
+      const e = document.querySelector(sel); if (!e) return { sel, got: null };
+      const r = e.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const el = document.elementFromPoint(x, y);
+      return { sel, got: el ? (el.id || el.className || el.tagName) : null, ok: !!(el && (el === e || e.contains(el))) };
+    };
+    return { settings: at("#btnSettings"), mute: at("#btnMute") };
+  });
+  try { await dp.click("#btnSettings", { timeout: 5000 }); await dp.waitForSelector("#settings:not([hidden])", { timeout: 3000 }); diag.settingsOpen = true; await clickEval(dp, "[data-close]"); }
+  catch (e) { diag.settingsOpen = false; diag.settingsErr = String((e && e.message) || e).slice(0, 120); }
+
+  /* — 静音（语音）按钮切换 — */
+  diag.muteBefore = await dp.evaluate(() => localStorage.getItem("anan.settings.v2"));
+  try { await dp.click("#btnMute", { timeout: 5000 }); diag.muteToggled = await dp.getAttribute("#btnMute", "aria-pressed"); }
+  catch (e) { diag.muteErr = String((e && e.message) || e).slice(0, 120); }
+  await clickEval(dp, "#btnMute"); // 复位
+
+  /* — `\` 多气泡解析（确定性，不依赖网络）— */
+  diag.split = await dp.evaluate(() => {
+    const r = window.AnAn.parseIntent("<mood>happy</mood><act>nod,smile</act>\n你好呀\\今天过得怎么样？\\我给你讲件有意思的事");
+    return { parts: r.parts, clean: r.clean, mood: r.mood, acts: r.acts };
+  });
+
   await dp.evaluate(() => window.__ananPlay("look_away"));
-  await dp.waitForTimeout(600);
+  await dp.waitForTimeout(500);
   diag.applied_lookaway = await dp.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
   await shot(dp, "d2-gesture");
 
-  // Edge TTS 探测
-  diag.tts = await dp.evaluate(async () => {
-    try { const t = window.__anan.tts; t.resume();
-      const r = await t.speak("你好呀", { engine: "edge", edgeVoice: "zh-CN-XiaoxiaoNeural", rate: 1, pitch: 1, volume: 0 });
-      return { engine: r && r.engine, last: t.lastEngine, voice: t.lastVoice || null, err: t.lastError || null };
-    } catch (e) { return { error: String((e && e.message) || e) }; }
-  });
-
-  // 对话
+  /* — 对话 — */
   if (K && M) {
     await dp.fill("#chatInput", "你好，用一句话介绍自己，并在开头用动作标签表现出你很开心");
     await clickEval(dp, "#btnSend");
@@ -82,16 +98,14 @@ try {
     diag.bubbleText = await dp.evaluate(() => { const b = document.querySelector("#bubbleStack .bubble .txt"); const m = document.querySelector("#feed .msg.ai"); return (b && b.textContent) || (m && m.textContent) || null; });
     diag.feedText = await dp.evaluate(() => Array.from(document.querySelectorAll("#feed .msg")).map(e => e.className.replace("msg ", "") + ":" + e.textContent));
     diag.mood = await dp.evaluate(() => window.__anan.mood);
-    diag.historyLen = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.mem.v2")).anan.history.length; } catch (e) { return null; } });
-    diag.lastReasoning = await dp.evaluate(() => (window.__anan.lastReasoning || "").slice(0, 80));
 
-    // 长回复 → 应自动启用消息栏（mode A）
-    await dp.fill("#chatInput", "用至少六句话详细介绍一下你自己");
+    // 让 AI 明确用 \ 分成多条（验证服务端是否照做）
+    await dp.fill("#chatInput", "请用反斜杠\\把你的一句话分成三段，就像一句一句慢慢说");
     await clickEval(dp, "#btnSend");
-    await dp.waitForFunction(() => document.querySelectorAll("#feed .msg.ai").length > 0, { timeout: 120000 }).catch(() => diag.steps.push("long-timeout"));
-    await dp.waitForTimeout(2200);
-    diag.feedMode = await dp.evaluate(() => ({ aiMsgs: document.querySelectorAll("#feed .msg.ai").length, headBubbles: document.querySelectorAll("#bubbleStack .bubble").length }));
-    await shot(dp, "d5-long");
+    await dp.waitForFunction(() => window.__anan && window.__anan.busy === false, { timeout: 120000 }).catch(() => {});
+    await dp.waitForTimeout(2500);
+    diag.splitBubbles = await dp.evaluate(() => Array.from(document.querySelectorAll("#bubbleStack .bubble .txt")).map(e => e.textContent));
+    await shot(dp, "d5-split");
 
     // 记忆压缩
     diag.compact = await dp.evaluate(async () => {
@@ -99,31 +113,53 @@ try {
         const s = JSON.parse(localStorage.getItem("anan.settings.v2") || "{}");
         const st = { summary: "", history: [] };
         for (let i = 0; i < 12; i++) st.history.push({ role: i % 2 ? "assistant" : "user", content: "这是第" + i + "条消息，用来测试记忆压缩。" + "内容内容内容内容内容内容内容内容内容内容" });
-        const before = st.history.length;
         const llm = new window.AnAn.LLM({ baseUrl: s.baseUrl, apiKey: s.apiKey, model: s.model });
         const r = await window.AnAn.compact(llm, { ctxWindow: 2000, keepRecent: 2 }, st, "你是测试角色。");
-        return { compacted: r.compacted, summaryLen: (st.summary || "").length, histBefore: before, histAfter: st.history.length, err: r.error || null };
+        return { compacted: r.compacted, summaryLen: (st.summary || "").length, histAfter: st.history.length, err: r.error || null };
       } catch (e) { return { err: String((e && e.message) || e) }; }
     });
   }
 
-  // 等待动画/请求结束，再切换模型
   await dp.waitForFunction(() => window.__anan && window.__anan.busy === false, { timeout: 90000 }).catch(() => diag.steps.push("busy-wait-timeout"));
   await dp.waitForTimeout(600);
 
-  // 切换模型 → 女仆
+  /* — 切换 2D 模型：女仆 — */
   diag.switch = await dp.evaluate(async () => {
     try { await window.__ananSwitch("maid"); return { ok: true, id: window.__ananModelId }; }
-    catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+    catch (e) { return { ok: false, err: String((e && e.message) || e) }; }
   });
   await dp.waitForTimeout(2500);
   await shot(dp, "d4-maid");
   diag.maidParamCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
   diag.maidHasArm = await dp.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamArmR") !== -1; } catch (e) { return null; } });
-  diag.maidArmParams = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().filter((p) => /arm|Arm/i.test(p)); } catch (e) { return null; } });
-  diag.memKeys = await dp.evaluate(() => { try { const m = JSON.parse(localStorage.getItem("anan.mem.v2")) || {}; return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { h: (v.history || []).length, s: (v.summary || "").length }])); } catch (e) { return { err: String(e.message) }; } });
-  diag.settingsModel = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.settings.v2")).modelId; } catch (e) { return null; } });
-  diag.maidBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; });
+  // 女仆手臂动作是否真的产生了参数变化
+  await dp.evaluate(() => window.__ananPlay("arm_wave"));
+  await dp.waitForTimeout(500);
+  diag.maidArmAdds = await dp.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
+  await shot(dp, "d4b-maid-arm");
+
+  /* — 切换 3D 模型：薄荷 — */
+  diag.mmd = await dp.evaluate(async () => {
+    try { await window.__ananSwitch("mint"); return { ok: true, kind: window.__ananKind, id: window.__ananModelId }; }
+    catch (e) { return { ok: false, err: String((e && e.message) || e) }; }
+  });
+  await dp.waitForFunction(() => window.__ananLoading === false, { timeout: 180000 }).catch(() => {});
+  await dp.waitForTimeout(3500);
+  diag.mmdState = await dp.evaluate(() => {
+    try {
+      const c = document.getElementById("3d-canvas");
+      return { ready: window.__anan.mmd._ready, vis: !c.hidden, w: c.width, h: c.height, modelH: Math.round(window.__anan.mmd._modelH || 0), hasHead: !!window.__anan.mmd._bones.head };
+    } catch (e) { return { err: String((e && e.message) || e) }; }
+  });
+  diag.mmdMorphs = await dp.evaluate(() => { try { return Object.keys(window.__anan.mmd._morphs || {}); } catch (e) { return null; } });
+  await shot(dp, "d6-3d");
+  // 拖动旋转
+  const yaw0 = await dp.evaluate(() => window.__anan.mmd._yaw);
+  await dp.mouse.move(640, 400); await dp.mouse.down(); await dp.mouse.move(820, 360, { steps: 10 }); await dp.mouse.up();
+  await dp.waitForTimeout(400);
+  const yaw1 = await dp.evaluate(() => window.__anan.mmd._yaw);
+  diag.mmdDrag = { yaw0: +yaw0.toFixed(3), yaw1: +yaw1.toFixed(3), changed: Math.abs(yaw1 - yaw0) > 0.1 };
+  await shot(dp, "d6b-3d-rotated");
   await dctx.close();
 
   /* ═══ 2. 移动端（响应式 / 溢出检查）═══ */
@@ -142,7 +178,6 @@ try {
       model: (function () { try { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), w: Math.round(b.width), y: Math.round(b.y), h: Math.round(b.height) }; } catch (e) { return null; } })()
     };
   });
-  // 触发一次气泡，检查气泡不越界
   await mp.evaluate(() => window.__ananPlay("nod"));
   await mp.waitForTimeout(300);
   await clickEval(mp, "#chatInput");
@@ -158,8 +193,7 @@ try {
   diag.dark = await kp.evaluate(() => ({
     htmlClass: document.documentElement.className,
     htmlBg: getComputedStyle(document.documentElement).backgroundColor,
-    bodyBg: getComputedStyle(document.body).backgroundColor,
-    canvasBg: getComputedStyle(document.querySelector("#bg")).backgroundColor
+    bodyBg: getComputedStyle(document.body).backgroundColor
   }));
   diag.darkEarlyBg = earlyBg;
   await kctx.close();
@@ -169,5 +203,5 @@ try {
 }
 
 fs.writeFileSync(`${outDir}/${tag}-diag.json`, JSON.stringify(diag, null, 2));
-log(JSON.stringify(diag, null, 2).slice(0, 4500));
+log(JSON.stringify(diag, null, 2).slice(0, 5000));
 await browser.close();

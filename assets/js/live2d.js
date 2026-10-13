@@ -205,5 +205,17 @@
   };
   Live2D.prototype.getParams = function () { return this._params.slice(); };
 
+  /* ── 统一控制器接口（供 app 与 3D 控制器共用）── */
+  Live2D.prototype.show = function () { if (this.canvas) this.canvas.hidden = false; };
+  Live2D.prototype.hide = function () { if (this.canvas) this.canvas.hidden = true; };
+  Live2D.prototype.setMood = function (m) { if (this.engine) this.engine.setMood(m); };
+  Live2D.prototype.playGesture = function (n) { return this.engine ? this.engine.playGesture(n) : false; };
+  Live2D.prototype.setIdle = function (o) { if (this.engine) this.engine.setIdle(o); };
+  Live2D.prototype.setMouthScale = function (s) { if (this.engine) this.engine.setMouthScale(s); };
+  Live2D.prototype.setSpeaking = function (o) { if (this.engine) this.engine.setSpeaking(o); };
+  Live2D.prototype.setMouthLevel = function (v) { if (this.engine) this.engine.setMouthLevel(v); };
+  Live2D.prototype.setAudioDriven = function (b) { if (this.engine) this.engine.setAudioDriven(b); };
+  Live2D.prototype.layoutScale = function () { this.layout(); };
+
   AnAn.Live2D = Live2D;
 })(window);

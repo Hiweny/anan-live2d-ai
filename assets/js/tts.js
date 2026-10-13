@@ -1,97 +1,12 @@
 /* ═══════════════════════════════════════════════════════════
    tts.js — 语音合成
-   1) 微软 Edge TTS（免费在线，WebSocket，自动计算 Sec-MS-GEC 令牌）
-   2) 浏览器内置语音（Web Speech API）
-   3) OpenAI 兼容 /audio/speech
+   1) 浏览器内置语音（Web Speech API，稳定，离线可用）
+   2) OpenAI 兼容 /audio/speech
+   （微软 Edge TTS 在线接口已被服务端限制，不再内置）
    ═══════════════════════════════════════════════════════════ */
 (function (root) {
   "use strict";
   const AnAn = (root.AnAn = root.AnAn || {});
-  const TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
-
-  function uuid() {
-    if (crypto.randomUUID) return crypto.randomUUID().replace(/-/g, "");
-    return "xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-      const r = (Math.random() * 16) | 0;
-      return (c === "x" ? r : (r & 3) | 8).toString(16);
-    });
-  }
-  async function secMsGec() {
-    let ticks = BigInt(Math.floor(Date.now() / 1000)) + 11644473600n;
-    ticks = ticks * 10000000n;
-    ticks = ticks - (ticks % 3000000000n);
-    const str = ticks.toString() + TOKEN;
-    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
-    return Array.prototype.map.call(new Uint8Array(buf), b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
-  }
-  function esc(s) {
-    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
-  function rateStr(r) { const p = Math.round((r - 1) * 100); return (p >= 0 ? "+" : "") + p + "%"; }
-  function pitchStr(p) { const hz = Math.round((p - 1) * 50); return (hz >= 0 ? "+" : "") + hz + "Hz"; }
-
-  /* ── Edge TTS ── */
-  async function edgeSynth(text, o) {
-    const voice = o.voice || "zh-CN-XiaoxiaoNeural";
-    const gec = await secMsGec();
-    const cid = uuid();
-    const url =
-      "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1" +
-      "?TrustedClientToken=" + TOKEN +
-      "&Sec-MS-GEC=" + gec +
-      "&Sec-MS-GEC-Version=1-130.0.2849.68" +
-      "&ConnectionId=" + cid;
-
-    return new Promise(function (resolve, reject) {
-      let ws;
-      try { ws = new WebSocket(url); } catch (e) { return reject(e); }
-      ws.binaryType = "arraybuffer";
-      const chunks = [];
-      let finished = false;
-      const timer = setTimeout(function () { cleanup(); reject(new Error("Edge TTS 超时")); }, 20000);
-      function cleanup() { try { ws && ws.close(); } catch (e) {} }
-      function finish() {
-        if (finished) return; finished = true; clearTimeout(timer); cleanup();
-        if (!chunks.length) return reject(new Error("Edge TTS 无音频返回"));
-        resolve(new Blob(chunks, { type: "audio/mpeg" }));
-      }
-      ws.onopen = function () {
-        try {
-          ws.send("X-Timestamp:" + new Date().toISOString() + "\r\n" +
-            "Content-Type:application/json; charset=utf-8\r\n" +
-            "Path:speech.config\r\n\r\n" +
-            JSON.stringify({ context: { synthesis: { audio: {
-              metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: false },
-              outputFormat: "audio-24khz-48kbitrate-mono-mp3" } } } }));
-          const ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="zh-CN">' +
-            '<voice name="' + voice + '"><prosody pitch="' + pitchStr(o.pitch || 1) +
-            '" rate="' + rateStr(o.rate || 1) + '" volume="+0%">' + esc(text) + '</prosody></voice></speak>';
-          ws.send("X-RequestId:" + uuid() + "\r\n" +
-            "Content-Type:application/ssml+xml\r\n" +
-            "X-Timestamp:" + new Date().toISOString() + "\r\n" +
-            "Path:ssml\r\n\r\n" + ssml);
-        } catch (e) { clearTimeout(timer); cleanup(); reject(e); }
-      };
-      ws.onmessage = function (ev) {
-        if (typeof ev.data === "string") {
-          if (ev.data.indexOf("Path:turn.end") !== -1) finish();
-          return;
-        }
-        try {
-          const buf = new Uint8Array(ev.data);
-          const hlen = (buf[0] << 8) | buf[1];
-          const header = new TextDecoder().decode(buf.slice(2, 2 + hlen));
-          if (header.indexOf("Path:audio") !== -1) chunks.push(buf.slice(2 + hlen));
-        } catch (e) {}
-      };
-      ws.onerror = function () { clearTimeout(timer); if (!finished) { finished = true; cleanup(); reject(new Error("Edge TTS 连接失败")); } };
-      ws.onclose = function (e) {
-        if (finished) return;
-        if (chunks.length) finish();
-        else { finished = true; clearTimeout(timer); reject(new Error("Edge TTS 已关闭 " + (e && e.code))); }
-      };
-    });
-  }
 
   /* ── TTS 管理器 ── */
   function TTS() {
@@ -101,6 +16,8 @@
     this.playing = false;
     this._blobUrl = null;
     this.lastEngine = "";
+    this.lastVoice = "";
+    this.lastError = null;
   }
 
   TTS.prototype._ensureContext = function () {
@@ -146,6 +63,17 @@
     });
   };
 
+  /* 自动挑选系统里最好的中文神经音色 */
+  TTS.prototype._pickVoice = function (wantName) {
+    if (!root.speechSynthesis) return null;
+    var vs = speechSynthesis.getVoices() || [];
+    if (wantName) { var hit = vs.filter(function (x) { return x.name === wantName; })[0]; if (hit) return hit; }
+    var zh = vs.filter(function (x) { return /zh|Chinese|\u4e2d\u6587/i.test(x.lang + " " + x.name); });
+    return zh.filter(function (x) { return /Online \(Natural\)/i.test(x.name); })[0]
+      || zh.filter(function (x) { return /Xiaoxiao|Xiaoyi|Xiaobei|Xiaomo|Xiaohan|Xiaoxuan|Huihui|Yaoyao|Kangkang/i.test(x.name); })[0]
+      || zh[0] || null;
+  };
+
   TTS.prototype._speakWeb = function (text, cfg) {
     const self = this;
     return new Promise(function (resolve) {
@@ -156,15 +84,7 @@
       u.rate = cfg.rate || 1;
       u.pitch = cfg.pitch || 1;
       u.volume = cfg.volume == null ? 1 : cfg.volume;
-      var vs = speechSynthesis.getVoices() || [];
-      var v = null;
-      if (cfg.voiceName) v = vs.filter(function (x) { return x.name === cfg.voiceName; })[0];
-      if (!v) {
-        var zh = vs.filter(function (x) { return /zh|Chinese|\u4e2d\u6587/i.test(x.lang + " " + x.name); });
-        v = zh.filter(function (x) { return /Online \(Natural\)/i.test(x.name); })[0]
-          || zh.filter(function (x) { return /Xiaoxiao|Xiaoyi|Xiaobei|Huihui|Yaoyao|Kangkang|Xiaomo/i.test(x.name); })[0]
-          || zh[0] || null;
-      }
+      const v = self._pickVoice(cfg.voiceName);
       if (v) { u.voice = v; if (v.lang) u.lang = v.lang; }
       self.lastVoice = v ? v.name : "(default)";
       let ended = false;
@@ -201,12 +121,7 @@
   TTS.prototype.speak = async function (text, cfg) {
     if (!text || !text.trim()) return { engine: "none" };
     cfg = cfg || {};
-    const engine = cfg.engine || "edge";
-    if (engine === "webspeech") {
-      this.lastEngine = "webspeech";
-      await this._speakWeb(text, cfg);
-      return { engine: "webspeech" };
-    }
+    const engine = cfg.engine || "webspeech";
     if (engine === "openai") {
       try {
         this.lastEngine = "openai";
@@ -214,29 +129,13 @@
         return { engine: "openai" };
       } catch (e) {
         AnAn.log("OpenAI TTS 失败，回退浏览器语音", e);
+        this.lastError = String((e && e.message) || e);
         cfg.onFallback && cfg.onFallback("OpenAI TTS 失败，已改用浏览器语音");
-        this.lastEngine = "webspeech";
-        await this._speakWeb(text, cfg);
-        return { engine: "webspeech" };
       }
     }
-    // edge（默认）
-    try {
-      const blob = await edgeSynth(text, {
-        voice: cfg.edgeVoice || "zh-CN-XiaoxiaoNeural",
-        rate: cfg.rate || 1, pitch: cfg.pitch || 1
-      });
-      this.lastEngine = "edge";
-      await this._playBlob(blob, cfg);
-      return { engine: "edge" };
-    } catch (e) {
-      AnAn.log("Edge TTS 失败，回退浏览器语音", e);
-      this.lastError = String((e && e.message) || e);
-      cfg.onFallback && cfg.onFallback("微软 Edge TTS 暂不可用，已自动改用浏览器语音");
-      this.lastEngine = "webspeech";
-      await this._speakWeb(text, cfg);
-      return { engine: "webspeech" };
-    }
+    this.lastEngine = "webspeech";
+    await this._speakWeb(text, cfg);
+    return { engine: "webspeech" };
   };
 
   TTS.prototype.stop = function () {
@@ -251,5 +150,4 @@
   };
 
   AnAn.TTS = TTS;
-  AnAn.edgeSynth = edgeSynth;
 })(window);
