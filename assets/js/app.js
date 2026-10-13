@@ -49,9 +49,11 @@
   function setupViewport() {
     const vv = window.visualViewport;
     if (!vv) return;
+    let lastH = -1, lastT = -1;
     const upd = function () {
-      document.documentElement.style.setProperty("--vvh", vv.height + "px");
-      document.documentElement.style.setProperty("--vvt", vv.offsetTop + "px");
+      const h = Math.round(vv.height), t = Math.round(vv.offsetTop);
+      if (h !== lastH) { lastH = h; document.documentElement.style.setProperty("--vvh", h + "px"); }
+      if (t !== lastT) { lastT = t; document.documentElement.style.setProperty("--vvt", t + "px"); }
       // 只重排气泡位置，不改变模型 inset（避免键盘弹起时模型被压缩）
       layoutStack();
     };
