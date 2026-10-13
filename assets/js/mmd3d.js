@@ -166,7 +166,10 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     // 适配
     const box = new THREE.Box3().setFromObject(model);
     this._modelH = Math.max(1, box.max.y - box.min.y);
-    this._fit();
+    this._computeFit();
+    this._dist = this._baseDist;
+    this._pitch = 0.08;
+    this._yaw = 0;
     this._applyTransform();
 
     this._ready = true;

@@ -139,16 +139,20 @@ try {
   await shot(dp, "d4b-maid-arm");
 
   /* — 切换 3D 模型：薄荷 — */
+  await dp.waitForFunction(() => window.__anan && window.__anan.busy === false, { timeout: 60000 }).catch(() => {});
   diag.mmd = await dp.evaluate(async () => {
     try { await window.__ananSwitch("mint"); return { ok: true, kind: window.__ananKind, id: window.__ananModelId }; }
     catch (e) { return { ok: false, err: String((e && e.message) || e) }; }
   });
   await dp.waitForFunction(() => window.__ananLoading === false, { timeout: 180000 }).catch(() => {});
-  await dp.waitForTimeout(3500);
+  await dp.waitForFunction(() => window.__anan && window.__anan.mmd && window.__anan.mmd._ready === true, { timeout: 180000 }).catch(() => diag.steps.push("mmd-not-ready"));
+  await dp.waitForTimeout(2500);
+  diag.mmdLoadError = await dp.evaluate(() => window.__ananLoadError || null);
+  diag.mmdModelId = await dp.evaluate(() => window.__ananModelId);
   diag.mmdState = await dp.evaluate(() => {
     try {
       const c = document.getElementById("3d-canvas");
-      return { ready: window.__anan.mmd._ready, vis: !c.hidden, w: c.width, h: c.height, modelH: Math.round(window.__anan.mmd._modelH || 0), hasHead: !!window.__anan.mmd._bones.head };
+      return { ready: window.__anan.mmd._ready, vis: !c.hidden, w: c.width, h: c.height, modelH: Math.round(window.__anan.mmd._modelH || 0), hasHead: !!window.__anan.mmd._bones.head, morphObjs: (window.__anan.mmd._morphObjs || []).length };
     } catch (e) { return { err: String((e && e.message) || e) }; }
   });
   diag.mmdMorphs = await dp.evaluate(() => { try { return Object.keys(window.__anan.mmd._morphs || {}); } catch (e) { return null; } });

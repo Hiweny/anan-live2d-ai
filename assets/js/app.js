@@ -364,9 +364,11 @@
     try {
       state.avatar = ensureAvatar(DEF);
       await state.avatar.load(DEF);
+      window.__ananLoadError = null;
     } catch (e) {
       window.__ananLoading = false; hideLoading();
-      addBubble("模型加载失败 😢 " + ((e && e.message) || e), "reply");
+      window.__ananLoadError = String((e && e.message) || e);
+      addBubble("模型加载失败 😢 " + window.__ananLoadError, "reply");
       return;
     }
     hideLoading();
