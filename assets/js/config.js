@@ -29,7 +29,7 @@
     turn_left: "向左转身", turn_right: "向右转身", turn_around: "原地转一圈", spin: "原地旋转",
     bounce: "轻蹦", jump: "跳一下", step: "迈一步", weight_shift: "重心左右移动", crouch: "蹲下", kick: "踢腿",
     stretch: "伸懒腰", arm_wave: "挥手", wave_both: "双手挥手", cheer: "欢呼", arm_up: "举手",
-    point: "指一下", peace: "比耶", salute: "敬礼", arms_cross: "抱臂", hands_on_hips: "叉腰",
+    point: "指一下", peace: "比耶", salute: "敬礼",
     clap: "拍手", shrug: "耸肩", sway: "轻轻摇摆",
     shy: "害羞", think: "思考", pout: "嘟嘴", smile: "微笑", laugh: "笑",
     sad: "失落", angry: "生气", surprise: "吃惊"
