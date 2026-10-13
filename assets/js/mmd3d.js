@@ -105,8 +105,8 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       { b: "upper", a: "x", keys: [[0, 0], [0.32, 1.15], [0.72, 1.1], [1, 0]] },
       { b: "lower", a: "x", keys: [[0, 0], [0.32, -0.16], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.32, 0.34], [0.72, 0.3], [1, 0]] },
-      { b: "armL", a: "y", keys: [[0, 0], [0.32, -0.3], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.32, 0.3], [1, 0]] }] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.32, -0.3], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.32, -0.3], [1, 0]] }] },
     lean_back: { dur: 2.0, tracks: [
       { b: "upper", a: "x", keys: [[0, 0], [0.3, -0.42], [0.74, -0.36], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.3, -0.18], [1, 0]] }] },
@@ -180,7 +180,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     arm_up: { dur: 1.6, tracks: [{ arm: "R", off: [[0, 0], [0.3, 155], [0.78, 146], [1, 0]] }] },
     point: { dur: 1.8, tracks: [
       { arm: "R", off: [[0, 0], [0.3, 92], [0.78, 86], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.3, 0.5], [0.78, 0.45], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.75], [0.78, -0.68], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.3, -0.12], [1, 0]] }] },
     peace: { dur: 1.8, tracks: [
       { arm: "R", off: [[0, 0], [0.3, 138], [0.78, 130], [1, 0]] },
@@ -188,21 +188,21 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       { b: "head", a: "z", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
     salute: { dur: 1.8, tracks: [
       { arm: "R", off: [[0, 0], [0.3, 118], [0.78, 112], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.3, 0.6], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.7], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.3, -0.08], [1, 0]] }] },
     arms_cross: { dur: 2.2, tracks: [
       { arm: "L", off: [[0, 0], [0.35, 34], [1, 0]] },
       { arm: "R", off: [[0, 0], [0.35, 34], [1, 0]] },
-      { b: "armL", a: "y", keys: [[0, 0], [0.35, -0.85], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.35, 0.85], [1, 0]] }] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, -1.05], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -1.05], [1, 0]] }] },
     hands_on_hips: { dur: 2.2, tracks: [
       { arm: "L", off: [[0, 0], [0.35, 20], [1, 0]] },
       { arm: "R", off: [[0, 0], [0.35, 20], [1, 0]] },
-      { b: "armL", a: "y", keys: [[0, 0], [0.35, -0.45], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.35, 0.45], [1, 0]] }] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, -0.6], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.6], [1, 0]] }] },
     clap: { dur: 1.5, tracks: [
-      { b: "armL", a: "y", keys: [[0, 0], [0.2, -0.9], [0.4, -0.45], [0.6, -0.9], [0.8, -0.45], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.2, 0.9], [0.4, 0.45], [0.6, 0.9], [0.8, 0.45], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.2, -1.0], [0.4, -0.5], [0.6, -1.0], [0.8, -0.5], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.2, -1.0], [0.4, -0.5], [0.6, -1.0], [0.8, -0.5], [1, 0]] },
       { m: "smile", keys: [[0, 0], [0.3, 0.65], [0.8, 0.55], [1, 0]] }] },
     shrug: { dur: 1.6, tracks: [
       { arm: "L", off: [[0, 0], [0.3, 6], [0.78, 3], [1, 0]] },
@@ -216,8 +216,10 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       { m: "shy", keys: [[0, 0], [0.3, 0.9], [0.8, 0.75], [1, 0]] },
       { b: "head", a: "x", keys: [[0, 0], [0.3, 0.24], [0.8, 0.18], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.4, 0.22], [0.8, 0.16], [1, 0]] },
-      { b: "armL", a: "y", keys: [[0, 0], [0.35, -0.5], [0.85, -0.42], [1, 0]] },
-      { b: "armR", a: "y", keys: [[0, 0], [0.35, 0.5], [0.85, 0.42], [1, 0]] }] },
+      { arm: "L", off: [[0, 0], [0.35, 58], [0.85, 50], [1, 0]] },
+      { arm: "R", off: [[0, 0], [0.35, 58], [0.85, 50], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, -0.55], [0.85, -0.45], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.55], [0.85, -0.45], [1, 0]] }] },
     think: { dur: 2.6, tracks: [
       { b: "head", a: "z", keys: [[0, 0], [0.4, 0.2], [0.82, 0.15], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.4, -0.15], [0.82, -0.1], [1, 0]] },
@@ -636,10 +638,13 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
         continue;
       }
       const isArm = (slot === "armL" || slot === "armR");
-      if (isArm && (act === "raise" || act === "lift" || act === "bend")) {
-        /* 手臂：bend backward / raise up = 抬臂；bend forward / raise down = 放下（沿用语义） */
-        const up = (it.dir === "up" || it.dir === "backward" || it.dir === "back");
-        armOff[slot === "armL" ? "L" : "R"] += up ? Math.abs(amt) : -Math.abs(amt);
+      if (isArm && (act === "raise" || act === "lift")) {
+        armOff[slot === "armL" ? "L" : "R"] += (it.dir === "down" ? -Math.abs(amt) : Math.abs(amt));
+        continue;
+      }
+      if (isArm && act === "bend") {
+        if (it.dir === "backward" || it.dir === "back") armOff[slot === "armL" ? "L" : "R"] += Math.abs(amt);  // 抬
+        else addBone(slot, "x", -Math.abs(amt) * DEG);                                                          // 前摆
         continue;
       }
       const axis = MPL_AXIS[act];
