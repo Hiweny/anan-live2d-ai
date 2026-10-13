@@ -110,10 +110,13 @@ try {
     await shot(dp, "d3-chat");
   }
 
-  await dp.waitForFunction(() => window.__anan && window.__anan.busy === false, { timeout: 60000 }).catch(() => {});
-  await dp.waitForTimeout(400);
+  /* 重载页面，确保没有卡住的对话状态，再做 3D 测试 */
+  await dp.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+  await waitReady(dp);
+  await dp.waitForTimeout(800);
 
   /* ═══ 切换 3D（薄荷）═══ */
+  try {
   diag.mmd = await dp.evaluate(async () => { try { await window.__ananSwitch("mint"); return { ok: true, kind: window.__ananKind, id: window.__ananModelId }; } catch (e) { return { ok: false, err: String((e && e.message) || e) }; } });
   await dp.waitForFunction(() => window.__ananLoading === false, { timeout: 180000 }).catch(() => {});
   await dp.waitForFunction(() => window.__anan && window.__anan.mmd && window.__anan.mmd._ready === true, { timeout: 180000 }).catch(() => diag.steps.push("mmd-not-ready"));
@@ -143,11 +146,12 @@ try {
   await dp.waitForTimeout(600); await shot(dp, "d7c-wave");
 
   /* 拖动旋转 */
-  const yaw0 = await dp.evaluate(() => window.__anan.mmd._yaw);
+  const yaw0 = await dp.evaluate(() => (window.__anan.mmd ? window.__anan.mmd._yaw : 0));
   await dp.mouse.move(640, 400); await dp.mouse.down(); await dp.mouse.move(820, 360, { steps: 10 }); await dp.mouse.up();
   await dp.waitForTimeout(400);
-  const yaw1 = await dp.evaluate(() => window.__anan.mmd._yaw);
+  const yaw1 = await dp.evaluate(() => (window.__anan.mmd ? window.__anan.mmd._yaw : 0));
   diag.mmdDrag = { yaw0: +yaw0.toFixed(3), yaw1: +yaw1.toFixed(3), changed: Math.abs(yaw1 - yaw0) > 0.1 };
+  } catch (e) { diag.mmdFatal = String((e && e.message) || e); }
   await dctx.close();
 
   /* ═══ 2. 移动端 ═══ */

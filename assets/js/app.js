@@ -246,6 +246,7 @@
     }
     input.value = ""; autosize();
     state.busy = true; $("btnSend").disabled = true;
+    try {
     clearBubbles();
 
     const st = memOf(DEF.id);
@@ -314,10 +315,12 @@
       }
     }
 
-    state.busy = false; $("btnSend").disabled = false;
     await speak(display);
     if (!state.speaking) setStatus("待机中");
     scheduleFeedHide();
+    } finally {
+      state.busy = false; $("btnSend").disabled = false;   // 无论如何都复位，避免卡死
+    }
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
