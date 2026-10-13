@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════
-   mmd3d.js — 3D（MMD / PMX）控制器
-   Three.js + MMDLoader（无物理，纯静态渲染 + 程序化驱动）
-   支持：拖动旋转 / 滚轮・双指缩放 / 闲置自动旋转 /
-        待机呼吸摆动 / 表情（morph）/ 骨骼动作
+   mmd3d.js — 3D（MMD / PMX）控制器 v2
+   Three.js + MMDLoader（无物理，纯程序化驱动）
+   能力：拖动旋转 / 缩放 / 闲置慢转 / 自然站姿 /
+        全身体动作（含 360° 转身）/ 姿态（抱臂・叉腰…）/ 表情 morph / 口型
    ═══════════════════════════════════════════════════════════ */
 import * as THREE from "three";
 import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
@@ -10,7 +10,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
 (function (root) {
   "use strict";
   const AnAn = (root.AnAn = root.AnAn || {});
-  const EUL = { x: "x", y: "y", z: "z" };
 
   function smooth(u) { return u * u * (3 - 2 * u); }
   function sample(keys, x) {
@@ -27,30 +26,87 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     return keys[n - 1][1];
   }
 
-  /* 手势：track = { b: 骨骼槽位, a: 轴 x/y/z, keys, mode:'add'|'set' } 或 { m: morph槽位, keys } */
+  /* 手臂「下垂」基准（把 T-pose 放下来）：左腕 +z 抬起 / 右腕 -z 抬起 */
+  const REST = { armL: { z: -0.62 }, armR: { z: 0.62 } };
+
+  /* 姿态预设：arms 的手臂偏移（z 抬/放，x 前后摆） */
+  const ARMS = {
+    down:  { armL: { z: -0.62, x: 0.02 }, armR: { z: 0.62, x: -0.02 } },
+    open:  { armL: { z: -0.26, x: 0.05 }, armR: { z: 0.26, x: -0.05 } },
+    up:    { armL: { z: 1.12, x: 0.05 }, armR: { z: -1.12, x: -0.05 } },
+    cross: { armL: { z: -0.78, x: 0.62 }, armR: { z: 0.78, x: -0.62 } },
+    hips:  { armL: { z: -1.02, x: 0.5 }, armR: { z: 1.02, x: -0.5 } }
+  };
+  const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
+
+  /* ── 动作库（tracks 用骨骼槽位 a:'x'/'y'/'z'；b:'__root' 表示整体）── */
   const GEST = {
     idle: { dur: 0.4, tracks: [] },
-    nod: { dur: 1.0, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.22, -0.22], [0.45, 0.02], [0.7, -0.14], [1, 0]] }] },
+    nod: { dur: 1.0, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.22, 0.22], [0.46, 0.02], [0.72, 0.12], [1, 0]] }] },
     shake: { dur: 1.1, tracks: [
-      { b: "head", a: "y", keys: [[0, 0], [0.2, 0.24], [0.42, -0.24], [0.64, 0.17], [0.84, -0.17], [1, 0]] },
-      { b: "head", a: "z", keys: [[0, 0], [0.3, 0.05], [0.7, -0.05], [1, 0]] }] },
+      { b: "head", a: "y", keys: [[0, 0], [0.2, 0.24], [0.42, -0.24], [0.64, 0.17], [0.84, -0.17], [1, 0]] }] },
     tilt: { dur: 1.1, tracks: [
       { b: "head", a: "z", keys: [[0, 0], [0.35, 0.34], [0.78, 0.26], [1, 0]] },
-      { b: "head", a: "y", keys: [[0, 0], [0.4, 0.08], [1, 0]] }] },
+      { b: "head", a: "x", keys: [[0, 0], [0.4, -0.06], [1, 0]] }] },
+    look_up: { dur: 1.8, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.25, -0.3], [0.72, -0.24], [1, 0]] }] },
     look_away: { dur: 1.9, tracks: [
       { b: "head", a: "y", keys: [[0, 0], [0.22, 0.5], [0.74, 0.5], [1, 0]] },
       { b: "head", a: "z", keys: [[0, 0], [0.26, 0.12], [0.74, 0.12], [1, 0]] }] },
-    look_up: { dur: 1.8, tracks: [{ b: "head", a: "x", keys: [[0, 0], [0.25, 0.3], [0.72, 0.26], [1, 0]] }] },
-    bounceSoft: { dur: 1.0, tracks: [{ b: "__root", a: "y", keys: [[0, 0], [0.28, 0.7], [0.55, -0.15], [0.8, 0.35], [1, 0]] }] },
-    bounce: { dur: 0.95, tracks: [{ b: "__root", a: "y", keys: [[0, 0], [0.24, 1.2], [0.5, -0.25], [0.76, 0.6], [1, 0]] }] },
-    sway: { dur: 4.0, loop: true, tracks: [{ b: "__root", a: "rz", keys: [[0, 0], [0.25, 0.05], [0.5, 0], [0.75, -0.05], [1, 0]] }] },
-    surprise: { dur: 1.0, tracks: [
-      { b: "head", a: "x", keys: [[0, 0], [0.12, 0.26], [0.5, 0.1], [1, 0]] },
-      { m: "surprised", keys: [[0, 0], [0.15, 0.9], [0.55, 0.5], [1, 0]] }] },
+    turn_left: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, 1.35], [0.7, 1.35], [1, 0]] }] },
+    turn_right: { dur: 2.0, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.3, -1.35], [0.7, -1.35], [1, 0]] }] },
+    turn_around: { dur: 2.2, tracks: [{ b: "__root", a: "ry", keys: [[0, 0], [0.15, 0.2], [0.85, 6.48], [1, 6.48]] }] },
+    bow: { dur: 2.2, tracks: [
+      { b: "upper", a: "x", keys: [[0, 0], [0.3, 0.5], [0.65, 0.5], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.65, 0.2], [1, 0]] }] },
+    bounce: { dur: 0.95, tracks: [
+      { b: "__root", a: "y", keys: [[0, 0], [0.24, 1.1], [0.5, -0.2], [0.76, 0.5], [1, 0]] },
+      { b: "lower", a: "x", keys: [[0, 0], [0.24, -0.08], [1, 0]] }] },
+    jump: { dur: 1.3, tracks: [
+      { b: "__root", a: "y", keys: [[0, 0], [0.15, -0.3], [0.45, 1.9], [0.72, -0.1], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+    sway: { dur: 4.0, loop: true, tracks: [
+      { b: "__root", a: "rz", keys: [[0, 0], [0.25, 0.05], [0.5, 0], [0.75, -0.05], [1, 0]] },
+      { b: "upper", a: "z", keys: [[0, 0], [0.25, 0.05], [0.5, 0], [0.75, -0.05], [1, 0]] }] },
+    stretch: { dur: 2.0, tracks: [
+      { b: "armL", a: "z", keys: [[0, 0], [0.3, 1.7], [0.8, 1.6], [1, 0]] },
+      { b: "armR", a: "z", keys: [[0, 0], [0.3, -1.7], [0.8, -1.6], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, -0.18], [0.8, -0.12], [1, 0]] }] },
+    arm_wave: { dur: 1.8, tracks: [
+      { b: "armR", a: "z", keys: [[0, 0], [0.18, -1.35], [0.4, -1.05], [0.62, -1.35], [0.82, -1.05], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.25, 0.7], [0.75, 0.55], [1, 0]] }] },
+    arm_up: { dur: 1.6, tracks: [{ b: "armR", a: "z", keys: [[0, 0], [0.3, -1.6], [0.78, -1.5], [1, 0]] }] },
+    arms_cross: { dur: 2.2, tracks: [
+      { b: "armL", a: "z", keys: [[0, 0], [0.35, -0.16], [1, 0]] },
+      { b: "armR", a: "z", keys: [[0, 0], [0.35, 0.16], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.6], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.6], [1, 0]] }] },
+    hands_on_hips: { dur: 2.2, tracks: [
+      { b: "armL", a: "z", keys: [[0, 0], [0.35, -0.4], [1, 0]] },
+      { b: "armR", a: "z", keys: [[0, 0], [0.35, 0.4], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.55], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.55], [1, 0]] }] },
+    point: { dur: 1.8, tracks: [
+      { b: "armR", a: "z", keys: [[0, 0], [0.3, -0.7], [0.78, -0.65], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.3, -0.55], [0.78, -0.5], [1, 0]] },
+      { b: "head", a: "y", keys: [[0, 0], [0.3, -0.12], [1, 0]] }] },
+    peace: { dur: 1.8, tracks: [
+      { b: "armR", a: "z", keys: [[0, 0], [0.3, -1.5], [0.78, -1.42], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.3, 0.8], [0.78, 0.7], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.3, -0.1], [1, 0]] }] },
+    clap: { dur: 1.5, tracks: [
+      { b: "armL", a: "x", keys: [[0, 0], [0.2, 0.85], [0.4, 0.4], [0.6, 0.85], [0.8, 0.4], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.2, -0.85], [0.4, -0.4], [0.6, -0.85], [0.8, -0.4], [1, 0]] },
+      { m: "smile", keys: [[0, 0], [0.3, 0.65], [0.8, 0.55], [1, 0]] }] },
+    shrug: { dur: 1.6, tracks: [
+      { b: "armL", a: "z", keys: [[0, 0], [0.3, -0.05], [0.78, -0.02], [1, 0]] },
+      { b: "armR", a: "z", keys: [[0, 0], [0.3, 0.05], [0.78, 0.02], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.3, 0.1], [1, 0]] }] },
     shy: { dur: 2.2, tracks: [
-      { m: "shy", keys: [[0, 0], [0.3, 0.9], [0.8, 0.7], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.24], [0.8, 0.18], [1, 0]] },
-      { b: "head", a: "z", keys: [[0, 0], [0.4, 0.22], [0.8, 0.16], [1, 0]] }] },
+      { m: "shy", keys: [[0, 0], [0.3, 0.9], [0.8, 0.75], [1, 0]] },
+      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.22], [0.8, 0.16], [1, 0]] },
+      { b: "head", a: "z", keys: [[0, 0], [0.4, 0.22], [0.8, 0.16], [1, 0]] },
+      { b: "armL", a: "x", keys: [[0, 0], [0.35, 0.5], [0.85, 0.4], [1, 0]] },
+      { b: "armR", a: "x", keys: [[0, 0], [0.35, -0.5], [0.85, -0.4], [1, 0]] }] },
     think: { dur: 2.6, tracks: [
       { b: "head", a: "z", keys: [[0, 0], [0.4, 0.2], [0.82, 0.15], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.4, -0.15], [0.82, -0.1], [1, 0]] }] },
@@ -65,21 +121,9 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     angry: { dur: 1.6, tracks: [
       { m: "angry", keys: [[0, 0], [0.2, 0.95], [0.78, 0.7], [1, 0]] },
       { b: "head", a: "y", keys: [[0, 0], [0.15, 0.08], [0.35, -0.08], [0.55, 0.05], [1, 0]] }] },
-    stretch: { dur: 1.9, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.3, 0.7], [0.8, 0.62], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, -0.7], [0.8, -0.62], [1, 0]] },
-      { b: "head", a: "x", keys: [[0, 0], [0.3, 0.18], [0.8, 0.12], [1, 0]] }] },
-    arm_wave: { dur: 1.8, tracks: [
-      { b: "armR", a: "z", keys: [[0, 0], [0.18, -1.25], [0.4, -1.05], [0.62, -1.28], [0.82, -1.05], [1, 0]] },
-      { m: "smile", keys: [[0, 0], [0.25, 0.7], [0.75, 0.55], [1, 0]] }] },
-    arm_up: { dur: 1.6, tracks: [{ b: "armR", a: "z", keys: [[0, 0], [0.3, -1.4], [0.78, -1.32], [1, 0]] }] },
-    shrug: { dur: 1.6, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.3, 0.5], [0.78, 0.45], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.3, -0.5], [0.78, -0.45], [1, 0]] },
-      { b: "head", a: "z", keys: [[0, 0], [0.3, 0.1], [0.78, 0.08], [1, 0]] }] },
-    clap: { dur: 1.5, tracks: [
-      { b: "armL", a: "z", keys: [[0, 0], [0.2, 0.9], [0.4, 0.55], [0.6, 0.9], [0.8, 0.55], [1, 0]] },
-      { b: "armR", a: "z", keys: [[0, 0], [0.2, -0.9], [0.4, -0.55], [0.6, -0.9], [0.8, -0.55], [1, 0]] }] }
+    surprise: { dur: 1.0, tracks: [
+      { b: "head", a: "x", keys: [[0, 0], [0.12, -0.26], [0.5, -0.1], [1, 0]] },
+      { m: "surprised", keys: [[0, 0], [0.15, 0.9], [0.55, 0.5], [1, 0]] }] }
   };
 
   function MMD3D(opts) {
@@ -89,20 +133,20 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this.def = null;
     this._ready = false;
     this._visible = false;
-    // 视角
     this._yaw = 0; this._pitch = 0.06; this._dist = 40; this._baseDist = 40;
     this._target = new THREE.Vector3(0, 8, 0);
     this._idleT = 0; this._dragging = false;
     this._ptr = new Map(); this._pinch = 0;
-    // 用户变换
     this._scale = 1; this._ux = 0; this._uy = 0; this._opacity = 1;
     this._insetTop = 0; this._insetBottom = 0;
-    // 驱动
     this._acts = []; this._mood = null; this._moodT = 0;
     this._bones = {}; this._morphs = {}; this._morphObjs = [];
     this._base = new Map();
     this._speaking = false; this._mouthLevel = 0; this._mouthTarget = 0; this._mouthSimT = 0; this._mouthScale = 1;
+    this._posture = { arms: "down", facing: "front" };
+    this._armsCur = { armL: { z: ARMS.down.armL.z, x: ARMS.down.armL.x }, armR: { z: ARMS.down.armR.z, x: ARMS.down.armR.x } };
     this._last = 0; this._raf = null;
+    this.onProgress(0);
   }
 
   MMD3D.prototype._findBone = function (skeleton, keys) {
@@ -116,13 +160,11 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   MMD3D.prototype.load = async function (def) {
     const self = this;
     this.def = def;
-    this.canvas.hidden = false;
     if (!this._renderer) this._initRenderer();
     const W = this.canvas.clientWidth || root.innerWidth;
     const H = this.canvas.clientHeight || root.innerHeight;
     this._renderer.setSize(W, H, false);
 
-    // 卸载旧模型
     if (this._model) { this.scene.remove(this._model); this._model = null; }
 
     const loader = new MMDLoader();
@@ -132,13 +174,8 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     this.onProgress(0.95);
     this._model = model;
     this.scene.add(model);
+    model.traverse(function (o) { if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; } });
 
-    // 阴影 / 材质
-    model.traverse(function (o) {
-      if (o.isMesh) { o.frustumCulled = false; o.castShadow = false; }
-    });
-
-    // 骨骼 & morph
     let skinned = null;
     model.traverse(function (o) { if (!skinned && o.isSkinnedMesh) skinned = o; });
     this._skinned = skinned;
@@ -147,8 +184,12 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       const sk = skinned.skeleton;
       for (const slot in AnAn.MMD_BONES) this._bones[slot] = this._findBone(sk, AnAn.MMD_BONES[slot]);
       sk.bones.forEach(function (b) { self._base.set(b, { x: b.rotation.x, y: b.rotation.y, z: b.rotation.z }); });
+      // 把「自然站姿」并入基准，避免 T-pose
+      for (const slot in REST) {
+        const b = this._bones[slot], r = REST[slot];
+        if (b && this._base.has(b)) { const base = this._base.get(b); base.z += (r.z || 0); base.x += (r.x || 0); base.y += (r.y || 0); }
+      }
     }
-    // morphs
     this._morphs = {}; this._morphObjs = [];
     model.traverse(function (o) {
       if (o.isMesh && o.morphTargetDictionary && o.morphTargetInfluences) {
@@ -163,7 +204,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       }
     });
 
-    // 适配
     const box = new THREE.Box3().setFromObject(model);
     this._modelH = Math.max(1, box.max.y - box.min.y);
     this._computeFit();
@@ -192,7 +232,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     const cam = new THREE.PerspectiveCamera(32, 1, 1, 4000);
     this.camera = cam;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.72));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.74));
     const d1 = new THREE.DirectionalLight(0xffffff, 0.95); d1.position.set(3, 8, 6); scene.add(d1);
     const d2 = new THREE.DirectionalLight(0xbfd4ff, 0.42); d2.position.set(-5, 4, -4); scene.add(d2);
 
@@ -204,9 +244,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     const vh = this.canvas.clientHeight || root.innerHeight;
     const vw = this.canvas.clientWidth || root.innerWidth;
     const fov = this.camera.fov * Math.PI / 180;
-    // 让模型高度约占视口 64%
     let dist = (H * 0.5) / Math.tan(fov * 0.5) / 0.64;
-    // 竖屏时如果宽度不够，适当拉远
     const aspect = vw / Math.max(1, vh);
     if (aspect < 0.9) dist *= (0.9 / Math.max(0.5, aspect));
     this._baseDist = dist;
@@ -219,7 +257,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     cv.addEventListener("pointerdown", function (e) {
       cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
       self._ptr.set(e.pointerId, P(e));
-      self._dragStart = P(e); self._dragMoved = 0; self._idleT = 0;
+      self._dragMoved = 0; self._idleT = 0;
       if (self._ptr.size === 2) self._pinch = self._pinchDist();
     });
     cv.addEventListener("pointermove", function (e) {
@@ -281,8 +319,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   };
   MMD3D.prototype._applyTransform = function () {
     if (!this._model) return;
-    const H = this._modelH || 20;
-    this._model.position.set(this._ux * H * 0.35, this._uy * H * 0.25, 0);
     this._model.scale.setScalar(this._scale);
     const op = this._opacity;
     this._model.traverse(function (o) {
@@ -298,15 +334,16 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     const map = { happy: "smile", excited: "smile", calm: null, shy: "shy", sad: "sad", angry: "angry", surprised: "surprised", thinking: null, neutral: null };
     this._mood = map[mood] || null;
     this._moodT = 0;
-    // 也用一个轻微气质手势
-    if (mood === "happy" || mood === "excited") this.playGesture("bounceSoft");
+    if (mood === "happy" || mood === "excited") this.playGesture("bounce");
     else if (mood === "calm") this.playGesture("sway");
     else if (mood === "thinking") this.playGesture("think");
+    else if (mood === "shy") this.playGesture("shy");
   };
   MMD3D.prototype.clearMood = function () { this._mood = null; };
   MMD3D.prototype.playGesture = function (name) {
+    if (!name) return false;
     const g = GEST[name];
-    if (!g) return false;
+    if (!g || !g.tracks.length) return false;
     for (let i = 0; i < this._acts.length; i++) if (this._acts[i].name === name) return true;
     if (this._acts.length >= 2) return true;
     this._acts.push({ name: name, t: 0, dur: g.dur, tracks: g.tracks });
@@ -314,7 +351,20 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   };
   MMD3D.prototype.stopAll = function () { this._acts.length = 0; this._mood = null; };
 
-  MMD3D.prototype.setExpression = function () { /* 3D 用 mood 驱动 morph，这里忽略 pose */ };
+  /* 姿态（持续性）：arms=down|open|up|cross|hips, facing=front|left|right|back */
+  MMD3D.prototype.setPosture = function (raw) {
+    const p = { arms: "down", facing: "front" };
+    if (raw) {
+      String(raw).split(/[,;]+/).forEach(function (kv) {
+        const m = kv.split("="); if (m.length !== 2) return;
+        const k = m[0].trim().toLowerCase(), v = m[1].trim().toLowerCase();
+        if (k === "arms" && ARMS[v]) p.arms = v;
+        if (k === "facing" && FACING[v] != null) p.facing = v;
+      });
+    }
+    this._posture = p;
+  };
+  MMD3D.prototype.setExpression = function () { /* 3D 用 mood/posture 驱动，忽略 Live2D 表情名 */ };
 
   MMD3D.prototype.setIdle = function (on) { this._idleOn = !!on; };
   MMD3D.prototype.setMouthScale = function (s) { this._mouthScale = s || 1; };
@@ -330,10 +380,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   MMD3D.prototype._startLoop = function () {
     if (this._raf) return;
     const self = this;
-    const loop = function (now) {
-      self._raf = requestAnimationFrame(loop);
-      self._tick(now);
-    };
+    const loop = function (now) { self._raf = requestAnimationFrame(loop); self._tick(now); };
     this._raf = requestAnimationFrame(loop);
   };
 
@@ -343,83 +390,92 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     if (!(dt > 0) || dt > 0.5) dt = 1 / 60;
     this._idleT += dt;
 
-    // 口型
-    const ms = this._mouthScale;
     if (this._speaking) {
       this._mouthSimT += dt;
       if (this._audioDriven !== true) this._mouthTarget = Math.min(1, 0.2 + 0.6 * Math.abs(Math.sin(this._mouthSimT * 9.1)) * (0.6 + 0.4 * Math.random()));
     }
     this._mouthLevel += (this._mouthTarget - this._mouthLevel) * Math.min(1, dt * 16);
 
-    // 待机呼吸 / 自动旋转
     this._breath = (this._breath || 0) + dt;
-    if (this._idleOn !== false && this._idleT > 2.5 && !this._dragging && this._ptr.size === 0) this._yaw += dt * 0.16;
+    // 闲置：慢转 + 不打断手动操作
+    if (this._idleOn !== false && this._idleT > 2.5 && this._ptr.size === 0) this._yaw += dt * 0.16;
 
-    // 驱动骨骼 / morph
     this._drive(dt);
-    this._render(now);
+    this._render();
   };
 
   MMD3D.prototype._drive = function (dt) {
     const self = this;
-    // 重置到基准
     this._base.forEach(function (v, b) { b.rotation.x = v.x; b.rotation.y = v.y; b.rotation.z = v.z; });
-    const rootD = { y: 0, rz: 0 };
-    const morphAcc = {};
 
-    const addBone = function (slot, axis, v) {
-      const b = self._bones[slot]; if (!b) return;
-      b.rotation[axis] += v;
-    };
+    const rootD = { y: 0, ry: 0, rz: 0 };
+    const morphAcc = {};
+    const addBone = function (slot, axis, v) { const b = self._bones[slot]; if (b) b.rotation[axis] += v; };
+
+    // 姿态：手臂平滑过渡到目标
+    const tgt = ARMS[this._posture.arms] || ARMS.down;
+    const k = Math.min(1, dt * 6);
+    ["armL", "armR"].forEach(function (s) {
+      self._armsCur[s].z += (tgt[s].z - self._armsCur[s].z) * k;
+      self._armsCur[s].x += (tgt[s].x - self._armsCur[s].x) * k;
+    });
 
     // 情绪 morph
     if (this._mood != null && this._morphs[this._mood]) {
       this._moodT += dt;
-      const target = (this._mood === "smile") ? 0.55 : 0.7;
-      morphAcc[this._mood] = (morphAcc[this._mood] || 0) + target * Math.min(1, this._moodT * 2);
+      morphAcc[this._mood] = (morphAcc[this._mood] || 0) + ((this._mood === "smile") ? 0.5 : 0.68) * Math.min(1, this._moodT * 2);
     }
 
     // 动作
     for (let i = this._acts.length - 1; i >= 0; i--) {
       const a = this._acts[i];
       a.t += dt;
-      let u = a.t / a.dur;
+      const u = a.t / a.dur;
       if (u >= 1) { this._acts.splice(i, 1); continue; }
-      for (let k = 0; k < a.tracks.length; k++) {
-        const tr = a.tracks[k];
+      for (let j = 0; j < a.tracks.length; j++) {
+        const tr = a.tracks[j];
         const val = sample(tr.keys, u);
         if (tr.m) morphAcc[tr.m] = (morphAcc[tr.m] || 0) + val;
-        else if (tr.b === "__root") { if (tr.a === "y") rootD.y += val; else if (tr.a === "rz") rootD.rz += val; }
+        else if (tr.b === "__root") rootD[tr.a] += val;
         else addBone(tr.b, tr.a, val);
       }
     }
 
-    // 待机轻微
+    // 姿态手臂（在动作之后叠加，动作优先级更高的偏移仍生效）
+    addBone("armL", "z", this._armsCur.armL.z - REST.armL.z);
+    addBone("armR", "z", this._armsCur.armR.z - REST.armR.z);
+    addBone("armL", "x", this._armsCur.armL.x);
+    addBone("armR", "x", this._armsCur.armR.x);
+
+    // 待机微动作
     if (this._idleOn !== false) {
       const t = this._breath;
+      addBone("upper", "x", Math.sin(t * 1.6) * 0.03);
       addBone("head", "y", Math.sin(t * 0.7) * 0.02);
       addBone("head", "x", Math.sin(t * 1.1) * 0.012);
-      rootD.y += Math.sin(t * 1.6) * 0.06;
+      addBone("lower", "z", Math.sin(t * 0.9) * 0.02);
+      rootD.y += Math.sin(t * 1.6) * 0.05;
     }
 
-    // root（整体）
+    // 整体
     if (this._model) {
       const H = this._modelH || 20;
-      this._model.position.y = (this._uy * H * 0.25) + rootD.y * H * 0.01;
-      this._model.position.x = this._ux * H * 0.35;
+      const facing = FACING[this._posture.facing] || 0;
+      this._model.position.set(this._ux * H * 0.35, (this._uy * H * 0.25) + rootD.y * H * 0.01, 0);
+      this._model.rotation.y = facing + rootD.ry;
       this._model.rotation.z = rootD.rz;
     }
 
-    // morph 应用
+    // morph
     for (let i = 0; i < this._morphObjs.length; i++) {
-      const mesh = this._morphObjs[i]; const infl = mesh.morphTargetInfluences;
+      const infl = this._morphObjs[i].morphTargetInfluences;
       for (let j = 0; j < infl.length; j++) infl[j] = 0;
     }
     Object.keys(morphAcc).forEach(function (slot) {
       const m = self._morphs[slot]; if (!m) return;
       m.mesh.morphTargetInfluences[m.idx] = Math.max(0, Math.min(1, morphAcc[slot]));
     });
-    // 眨眼（自然）
+    // 眨眼
     if (this._morphs.blink && (!this._nextBlink || this._nextBlink < performance.now())) {
       this._nextBlink = performance.now() + 2200 + Math.random() * 3200;
       this._blinkStart = performance.now();
@@ -427,7 +483,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     if (this._blinkStart) {
       const e = (performance.now() - this._blinkStart) / 150;
       if (e >= 1) this._blinkStart = 0;
-      else { const v = e < 0.5 ? e * 2 : (1 - e) * 2; this._morphs.blink.mesh.morphTargetInfluences[this._morphs.blink.idx] = Math.max(this._morphs.blink.mesh.morphTargetInfluences[this._morphs.blink.idx], v); }
+      else { const v = e < 0.5 ? e * 2 : (1 - e) * 2; const m = this._morphs.blink; m.mesh.morphTargetInfluences[m.idx] = Math.max(m.mesh.morphTargetInfluences[m.idx], v); }
     }
     // 口型
     const mo = this._morphs.mouthOpen;
@@ -445,7 +501,6 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
     cam.lookAt(t);
     this._renderer.render(this.scene, cam);
 
-    // 头顶锚点（投影到屏幕）
     const head = this._bones.head || (this._skinned && this._skinned.skeleton.bones[0]);
     if (head) {
       const v = new THREE.Vector3();

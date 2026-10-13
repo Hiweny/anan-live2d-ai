@@ -43,12 +43,16 @@
   /* 解析回复：剥离全部控制标签（含残缺/未闭合），返回 {clean, mood, acts, poses} */
   AnAn.parseIntent = function (text) {
     let mood = "";
-    const acts = [], poses = [];
+    const acts = [], poses = [], poseVals = [];
     let s = String(text == null ? "" : text);
 
     const setMood = function (v) { const m = normMood(v); if (m) mood = m; };
     const addAct = function (v) { collectList(v).forEach(function (a) { const n = normAct(a); if (n) acts.push(n); }); };
-    const addPose = function (v) { collectList(v).forEach(function (a) { const n = normPose(a); if (n) poses.push(n); }); };
+    const addPose = function (v) {
+      // 保留原始写法（3D 姿态串需要），同时尝试映射为 Live2D 内置表情名
+      String(v).split(/[+,，、\s]+/).forEach(function (a) { a = String(a).trim(); if (a) poseVals.push(a); });
+      collectList(v).forEach(function (a) { const n = normPose(a); if (n) poses.push(n); });
+    };
 
     // 1) 闭合标签 <tag>..</tag>（可跨行）
     s = s.replace(/<\s*([A-Za-z\u4e00-\u9fa5]+)\s*>([\s\S]*?)<\s*\/\s*\1\s*>/g, function (m, tag, val) {

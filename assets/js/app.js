@@ -178,7 +178,11 @@
     if (state.avatar) state.avatar.setMood(mood);
   }
   function applyActs(acts) { (acts || []).forEach(function (a) { state.avatar && state.avatar.playGesture(a); }); }
-  function applyPoses(poses) { (poses || []).forEach(function (p) { state.avatar && state.avatar.setExpression(p); }); }
+  function applyPoses(poses, poseRaw) {
+    if (!state.avatar) return;
+    if (DEF.kind === "mmd") { state.avatar.setPosture(poseRaw || ""); return; }
+    (poses || []).forEach(function (p) { state.avatar.setExpression(p); });
+  }
 
   /* ── 语音 ── */
   function levelLoop() {
