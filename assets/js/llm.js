@@ -92,7 +92,7 @@
       if (seg.length > 1) parts = seg;
     }
     const clean = parts ? parts.join("\n") : s;
-    return { clean: clean, parts: parts, mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2) };
+    return { clean: clean, parts: parts, mood: mood, acts: uniq(acts).slice(0, 3), poses: uniq(poses).slice(0, 2), poseRaw: uniq(poseVals).slice(0, 4).join(",") };
   };
 
   AnAn.guessMood = function (text) {

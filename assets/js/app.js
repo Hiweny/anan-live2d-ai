@@ -221,7 +221,7 @@
   /* ── 记忆 ── */
   function sysPrompt() {
     const p = (S.personaByModel && S.personaByModel[DEF.id]) || DEF.persona;
-    return (S.autoTags ? p + AnAn.CONTROL_SPEC : p);
+    return (S.autoTags ? p + AnAn.buildControlSpec(DEF) : p);
   }
   function updateCtxInfo() {
     const st = memOf(DEF.id);
@@ -296,7 +296,7 @@
 
     applyMood(mood);
     applyActs(parsed.acts);
-    applyPoses(parsed.poses);
+    applyPoses(parsed.poses, parsed.poseRaw);
     setStatus("回复中…", "speaking");
 
     // 分段：优先使用模型显式的 \ 分段
@@ -363,12 +363,10 @@
       if (!AnAn.MMD3D) throw new Error("3D 模块尚未加载完成，请刷新页面重试");
       if (!state.mmd) state.mmd = new AnAn.MMD3D({ canvas: $("canvas3d"), onProgress: onProgress, onHit: onHit, onAnchor: layoutStack });
       if (state.live2d) state.live2d.hide();
-      state.mmd.show();
       return state.mmd;
     }
     if (!state.live2d) state.live2d = new AnAn.Live2D({ canvas: $("live2d-canvas"), onProgress: onProgress, onHit: onHit });
     if (state.mmd) state.mmd.hide();
-    state.live2d.show();
     return state.live2d;
   }
   async function reloadModel(showLoad) {
@@ -378,6 +376,7 @@
       state.avatar = ensureAvatar(DEF);
       await state.avatar.load(DEF);
       window.__ananLoadError = null;
+      state.avatar.show();   // 加载完成后才显示画布，杜绝绘制抖动/白闪
     } catch (e) {
       window.__ananLoading = false; hideLoading();
       window.__ananLoadError = String((e && e.message) || e);
@@ -576,7 +575,7 @@
     };
     $("btnResetModel").onclick = function () {
       S.modelScaleAdjust = AnAn.DEFAULTS.modelScaleAdjust; S.modelX = 0; S.modelY = 0; S.modelOpacity = 1; S.gaze = true; S.idleMotion = true; S.mouthScale = 1;
-      if (state.mmd) { state.mmd._yaw = 0; state.mmd._pitch = 0.08; state.mmd._dist = state.mmd._baseDist; }
+      if (state.mmd) { state.mmd._yaw = 0; state.mmd._pitch = 0.08; state.mmd._dist = state.mmd._baseDist; state.mmd.setPosture(""); }
       saveSettings(); fillSettings(); applyLive();
     };
     $("btnTestMotion").onclick = function () {
