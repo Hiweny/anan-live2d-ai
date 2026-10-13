@@ -33,9 +33,7 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   const ARMS = {
     down:  { armL: { z: -1.12, x: 0.0 }, armR: { z: 1.12, x: 0.0 }, eL: 0, eR: 0 },
     open:  { armL: { z: -0.5, x: 0.0 }, armR: { z: 0.5, x: 0.0 }, eL: 0, eR: 0 },
-    up:    { armL: { z: 1.25, x: 0.0 }, armR: { z: -1.25, x: 0.0 }, eL: 0, eR: 0 },
-    cross: { armL: { z: -0.5, x: -0.4 }, armR: { z: 0.5, x: -0.4 }, eL: -1.2, eR: 1.2 },
-    hips:  { armL: { z: -0.9, x: 0.15 }, armR: { z: 0.9, x: 0.15 }, eL: -1.4, eR: 1.4 }
+    up:    { armL: { z: 1.25, x: 0.0 }, armR: { z: -1.25, x: 0.0 }, eL: 0, eR: 0 }
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 

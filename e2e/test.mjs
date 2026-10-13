@@ -127,7 +127,7 @@ try {
   await shot(dp, "d6-3d-stand");        // 自然站姿（非 T-pose）
 
   /* 姿态实测 */
-  await dp.evaluate(() => window.__anan.mmd.setPosture("arms=cross,facing=left"));
+  await dp.evaluate(() => window.__anan.mmd.setPosture("arms=open,facing=left"));
   await dp.waitForTimeout(900); await shot(dp, "d6b-3d-pose");
   diag.mmdPosture = await dp.evaluate(() => window.__anan.mmd._posture);
   await dp.evaluate(() => window.__anan.mmd.setPosture("arms=up,facing=front"));

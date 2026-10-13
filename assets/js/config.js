@@ -30,7 +30,7 @@
     shy: "害羞", think: "思考", pout: "嘟嘴", smile: "微笑", laugh: "笑",
     sad: "失落", angry: "生气", surprise: "吃惊"
   };
-  AnAn.MMD_ARMS = { down: "自然垂放", open: "轻轻张开", cross: "抱臂", hips: "叉腰", up: "举起" };
+  AnAn.MMD_ARMS = { down: "自然垂放", open: "轻轻张开", up: "举起" };
   AnAn.MMD_FACING = { front: "正面", left: "侧向左", right: "侧向右", back: "背向" };
 
   /* ───────── 安An 的内置表情/道具姿势（exp3）───────── */
