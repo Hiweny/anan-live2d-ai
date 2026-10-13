@@ -27,15 +27,15 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
   }
 
   /* 手臂「下垂」基准（把 T-pose 放下来）：左腕 +z 抬起 / 右腕 -z 抬起 */
-  const REST = { armL: { z: -0.62 }, armR: { z: 0.62 } };
+  const REST = { armL: { z: -0.66 }, armR: { z: 0.66 } };
 
-  /* 姿态预设：arms 的手臂偏移（z 抬/放，x 前后摆） */
+  /* 姿态预设：手臂 z 抬/放、x 前后摆，肘部 z 弯曲（左右镜像） */
   const ARMS = {
-    down:  { armL: { z: -0.62, x: 0.02 }, armR: { z: 0.62, x: -0.02 } },
-    open:  { armL: { z: -0.26, x: 0.05 }, armR: { z: 0.26, x: -0.05 } },
-    up:    { armL: { z: 1.12, x: 0.05 }, armR: { z: -1.12, x: -0.05 } },
-    cross: { armL: { z: -0.78, x: 0.62 }, armR: { z: 0.78, x: -0.62 } },
-    hips:  { armL: { z: -1.02, x: 0.5 }, armR: { z: 1.02, x: -0.5 } }
+    down:  { armL: { z: -0.66, x: 0.0 }, armR: { z: 0.66, x: 0.0 }, eL: 0, eR: 0 },
+    open:  { armL: { z: -0.28, x: 0.0 }, armR: { z: 0.28, x: 0.0 }, eL: 0, eR: 0 },
+    up:    { armL: { z: 1.15, x: 0.0 }, armR: { z: -1.15, x: 0.0 }, eL: 0, eR: 0 },
+    cross: { armL: { z: -0.30, x: -0.38 }, armR: { z: 0.30, x: -0.38 }, eL: -1.15, eR: 1.15 },
+    hips:  { armL: { z: -0.72, x: 0.16 }, armR: { z: 0.72, x: 0.16 }, eL: -1.35, eR: 1.35 }
   };
   const FACING = { front: 0, left: Math.PI / 2, right: -Math.PI / 2, back: Math.PI };
 
@@ -419,6 +419,8 @@ import { MMDLoader } from "./lib/three/loaders/MMDLoader.js";
       self._armsCur[s].z += (tgt[s].z - self._armsCur[s].z) * k;
       self._armsCur[s].x += (tgt[s].x - self._armsCur[s].x) * k;
     });
+    self._armsCur.eL += ((tgt.eL || 0) - self._armsCur.eL) * k;
+    self._armsCur.eR += ((tgt.eR || 0) - self._armsCur.eR) * k;
 
     // 情绪 morph
     if (this._mood != null && this._morphs[this._mood]) {

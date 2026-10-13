@@ -130,6 +130,9 @@
     inputCollapsed: false
   };
 
+  /* 动作 → 该模型内置表情（Live2D）：让「动作」也能带出模型自带的表情 */
+  AnAn.ACT_POSE = { shy: "shy", think: "think", angry: "angry", sad: "down", surprise: "sur1", cry: "namida", sweat: "sweat" };
+
   /* ───────── 情绪 → 表现映射（Live2D，自然克制）───────── */
   AnAn.EMOTION_MAP = {
     happy:     { gesture: "bounceSoft", set: { ParamMouthForm: 0.42, ParamEyeLSmile: 0.6, ParamEyeRSmile: 0.6 }, add: { ParamBrowLY: 0.12, ParamBrowRY: 0.12, ParamCheek: 0.1 }, label: "开心" },
@@ -162,6 +165,8 @@
     center: ["センター", "center", "グルーブ"],
     armL: ["左腕", "arm_L", "armL"],
     armR: ["右腕", "arm_R", "armR"],
+    elbowL: ["左ひじ", "左肘", "elbowL"],
+    elbowR: ["右ひじ", "右肘", "elbowR"],
     shoulderL: ["左肩"],
     shoulderR: ["右肩"],
     legL: ["左足"],

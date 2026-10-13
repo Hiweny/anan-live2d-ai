@@ -177,7 +177,13 @@
     state.mood = mood;
     if (state.avatar) state.avatar.setMood(mood);
   }
-  function applyActs(acts) { (acts || []).forEach(function (a) { state.avatar && state.avatar.playGesture(a); }); }
+  function applyActs(acts) {
+    (acts || []).forEach(function (a) {
+      if (!state.avatar) return;
+      state.avatar.playGesture(a);
+      if (DEF.kind === "live2d" && AnAn.ACT_POSE && AnAn.ACT_POSE[a]) state.avatar.setExpression(AnAn.ACT_POSE[a]);
+    });
+  }
   function applyPoses(poses, poseRaw) {
     if (!state.avatar) return;
     if (DEF.kind === "mmd") { state.avatar.setPosture(poseRaw || ""); return; }
