@@ -121,7 +121,8 @@ try {
   diag.maidParamCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
   diag.maidHasArm = await dp.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamArmR") !== -1; } catch (e) { return null; } });
   diag.maidArmParams = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().filter((p) => /arm|Arm/i.test(p)); } catch (e) { return null; } });
-  diag.maidHistoryLen = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.mem.v2")).maid.history.length; } catch (e) { return null; } });
+  diag.memKeys = await dp.evaluate(() => { try { const m = JSON.parse(localStorage.getItem("anan.mem.v2")) || {}; return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { h: (v.history || []).length, s: (v.summary || "").length }])); } catch (e) { return { err: String(e.message) }; } });
+  diag.settingsModel = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.settings.v2")).modelId; } catch (e) { return null; } });
   diag.maidBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; });
   await dctx.close();
 
