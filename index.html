@@ -2,53 +2,47 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#f7d7e6" />
-<title>安An · AI 桌面伙伴</title>
-<meta name="description" content="一个由 AI 驱动的 Live2D 智能伙伴——会说话、会思考、会做表情。" />
-<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<meta name="color-scheme" content="light dark" />
+<title>安An · AI 伙伴</title>
+<meta name="description" content="由 AI 驱动的 Live2D 智能伙伴——会说话、会思考、会做表情。" />
 <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
 <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png" />
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
 <link rel="manifest" href="assets/site.webmanifest" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="stylesheet" href="assets/css/style.css" />
+<script>
+/* 预渲染主题：在任何绘制之前确定明暗，避免深色模式白闪 */
+(function () {
+  try {
+    var s = JSON.parse(localStorage.getItem("anan.settings.v2") || "{}");
+    var t = s.theme || "auto";
+    var dark = t === "dark" || (t === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var h = document.documentElement;
+    h.classList.add(dark ? "theme-dark" : "theme-light");
+    h.style.backgroundColor = dark ? "#12101c" : "#f4eefb";
+    h.style.colorScheme = dark ? "dark" : "light";
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", dark ? "#12101c" : "#f7d7e6");
+  } catch (e) {}
+})();
+</script>
 </head>
-<body class="theme-auto">
+<body>
 
-<!-- ═══════════════ 背景 ═══════════════ -->
 <div id="bg" aria-hidden="true">
-  <span class="orb orb-1"></span>
-  <span class="orb orb-2"></span>
-  <span class="orb orb-3"></span>
-  <span class="orb orb-4"></span>
+  <span class="orb orb-1"></span><span class="orb orb-2"></span>
+  <span class="orb orb-3"></span><span class="orb orb-4"></span>
   <div class="bg-grain"></div>
 </div>
 
-<!-- ═══════════════ 主舞台：Live2D ═══════════════ -->
-<main id="stage">
-  <canvas id="live2d-canvas"></canvas>
-
-  <!-- 头顶气泡（思考 / 说话 / 状态） -->
-  <div id="bubbleLayer" aria-live="polite">
-    <div id="bubble" class="bubble" data-state="hidden">
-      <div class="bubble-tail"></div>
-      <div class="bubble-body">
-        <div class="bubble-thinking" hidden>
-          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-          <span class="thinking-label">思考中</span>
-        </div>
-        <div class="bubble-text" data-role="text"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 顶栏 -->
+<main id="app">
   <header id="topbar">
     <div class="brand">
       <span class="brand-dot"></span>
       <span class="brand-name" id="brandName">安An</span>
-      <span class="brand-sub">AI · Live2D 伙伴</span>
+      <span class="brand-tag" id="brandTag">活泼少女</span>
     </div>
     <div class="bar-actions">
       <button class="icon-btn" id="btnMute" title="静音 / 开启语音" aria-pressed="false">
@@ -56,48 +50,46 @@
         <svg viewBox="0 0 24 24" class="ic-mute" hidden><path d="M11 5 6 9H3v6h3l5 4V5z"/><line x1="16" y1="9" x2="21" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="21" y1="9" x2="16" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
       <button class="icon-btn" id="btnSettings" title="设置">
-        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
       </button>
     </div>
   </header>
 
-  <!-- 加载中 -->
-  <div id="loading" class="screen">
-    <div class="loader">
-      <div class="loader-ring"></div>
-      <div class="loader-text">正在唤醒 <b>安An</b>…</div>
-      <div class="loader-bar"><i id="loaderBar"></i></div>
-      <div class="loader-pct" id="loaderPct">0%</div>
-    </div>
+  <div id="stage">
+    <canvas id="live2d-canvas"></canvas>
+    <div id="bubbleStack" aria-live="polite"></div>
   </div>
 
-  <!-- 开始遮罩（解锁音频） -->
-  <div id="guard" class="screen" hidden>
-    <button class="guard-btn" id="guardBtn">
-      <span class="guard-play">▶</span>
-      <span>轻触开始</span>
-    </button>
-    <p class="guard-hint">开始后可以和她聊天，点一点角色还会有反应哦～</p>
+  <div id="feedWrap">
+    <div id="feed" class="feed"></div>
   </div>
+
+  <footer id="dock">
+    <div class="dock-inner" id="dockInner">
+      <button class="dock-mini" id="btnCollapse" title="收起 / 展开输入框">
+        <svg viewBox="0 0 24 24" class="ic-collapse"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <textarea id="chatInput" rows="1" placeholder="和她说点什么吧…" autocomplete="off"></textarea>
+      <button class="round-btn send" id="btnSend" title="发送">
+        <svg viewBox="0 0 24 24"><path d="M4 12 20 4l-8 16-2.2-6.2L4 12z" fill="currentColor"/></svg>
+      </button>
+    </div>
+    <div class="dock-hint" id="dockHint">
+      <span id="statusText">待机中</span>
+      <span class="dot-sep">·</span><span class="ctxInfo" id="ctxInfo"></span>
+    </div>
+  </footer>
 </main>
 
-<!-- ═══════════════ 底部输入坞 ═══════════════ -->
-<footer id="dock">
-  <div id="quickChips" class="quick-chips"></div>
-  <div class="dock-inner">
-    <textarea id="chatInput" rows="1" placeholder="和 安An 说点什么吧…" autocomplete="off"></textarea>
-    <button class="round-btn send" id="btnSend" title="发送">
-      <svg viewBox="0 0 24 24"><path d="M4 12 20 4l-8 16-2.2-6.2L4 12z" fill="currentColor"/></svg>
-    </button>
+<div id="loading" class="screen">
+  <div class="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-text">正在唤醒 <b id="loadName">安An</b>…</div>
+    <div class="loader-bar"><i id="loaderBar"></i></div>
+    <div class="loader-pct" id="loaderPct">0%</div>
   </div>
-  <div class="dock-hint">
-    <span id="statusText">待机中</span>
-    <span class="dot-sep">·</span>
-    <span>Enter 发送 / Shift+Enter 换行</span>
-  </div>
-</footer>
+</div>
 
-<!-- ═══════════════ 设置面板 ═══════════════ -->
 <div id="settings" class="modal" hidden>
   <div class="modal-mask" data-close></div>
   <div class="modal-panel">
@@ -108,238 +100,152 @@
       </button>
     </div>
     <div class="modal-tabs" id="settingsTabs">
-      <button class="tab active" data-tab="persona">人设</button>
-      <button class="tab" data-tab="api">AI 接口</button>
-      <button class="tab" data-tab="tts">语音</button>
       <button class="tab" data-tab="model">形象</button>
+      <button class="tab active" data-tab="api">AI 接口</button>
+      <button class="tab" data-tab="persona">人设</button>
+      <button class="tab" data-tab="memory">记忆</button>
+      <button class="tab" data-tab="tts">语音</button>
       <button class="tab" data-tab="ui">界面</button>
       <button class="tab" data-tab="about">关于</button>
     </div>
-
     <div class="modal-body" id="settingsBody">
-      <!-- 人设 -->
-      <section class="tab-page" data-page="persona">
-        <label class="field">
-          <span class="field-label">系统提示词（人设）</span>
-          <textarea id="setPersona" rows="7" class="mono"></textarea>
-        </label>
-        <p class="field-tip">这是她的「人格」。可自由修改性格、说话风格、称呼方式。控制标签说明会自动附加在末尾。</p>
-        <label class="field-switch">
-          <input type="checkbox" id="setAutoTags" />
-          <span>自动附加「动作/表情控制标签」说明（推荐开启，让 AI 驱动动作）</span>
-        </label>
-        <label class="field">
-          <span class="field-label">对话记忆轮数</span>
-          <input type="range" id="setHistory" min="0" max="30" step="1" />
-          <output id="outHistory"></output>
-        </label>
-        <button class="btn ghost" id="btnResetPersona">恢复默认人设</button>
-      </section>
 
-      <!-- API -->
-      <section class="tab-page" data-page="api" hidden>
-        <label class="field">
-          <span class="field-label">接口地址 Base URL</span>
-          <input type="text" id="setBaseUrl" placeholder="https://your-api.com/v1" autocomplete="off" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span class="field-label">API Key</span>
-          <input type="password" id="setApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false" />
-        </label>
-        <label class="field">
-          <span class="field-label">模型名称 Model</span>
-          <input type="text" id="setModel" placeholder="gpt-4o-mini / glm-4-flash / ..." autocomplete="off" spellcheck="false" />
-        </label>
-        <div class="field-row">
-          <label class="field">
-            <span class="field-label">温度 Temperature</span>
-            <input type="range" id="setTemp" min="0" max="1.5" step="0.05" />
-            <output id="outTemp"></output>
-          </label>
-          <label class="field">
-            <span class="field-label">最大回复长度</span>
-            <input type="range" id="setMaxTokens" min="0" max="4096" step="64" />
-            <output id="outMaxTokens"></output>
-          </label>
-        </div>
-        <label class="field-switch">
-          <input type="checkbox" id="setStream" />
-          <span>流式输出（打字机效果，推荐）</span>
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setReasoning" />
-          <span>显示思考过程（若模型支持 reasoning，会把思考显示在思考气泡里）</span>
-        </label>
-        <div class="field-actions">
-          <button class="btn" id="btnTestApi">测试连接</button>
-          <span class="test-result" id="apiTestResult"></span>
-        </div>
-      </section>
-
-      <!-- 语音 -->
-      <section class="tab-page" data-page="tts" hidden>
-        <label class="field-switch">
-          <input type="checkbox" id="setTtsEnabled" />
-          <span>开启语音（她开口说话）</span>
-        </label>
-        <label class="field">
-          <span class="field-label">语音引擎</span>
-          <select id="setTtsEngine">
-            <option value="edge">微软 Edge TTS（免费·推荐）</option>
-            <option value="webspeech">浏览器内置语音（离线可用）</option>
-            <option value="openai">OpenAI 兼容 /audio/speech</option>
-          </select>
-        </label>
-        <div class="tts-engine-block" data-engine="edge">
-          <label class="field">
-            <span class="field-label">音色 Voice</span>
-            <select id="setEdgeVoice"></select>
-          </label>
-          <p class="field-tip">Edge TTS 使用微软免费在线语音合成，无需密钥。若浏览器限制连接，会自动回退到浏览器内置语音。</p>
-        </div>
-        <div class="tts-engine-block" data-engine="webspeech" hidden>
-          <label class="field">
-            <span class="field-label">系统音色</span>
-            <select id="setWebSpeechVoice"></select>
-          </label>
-        </div>
-        <div class="tts-engine-block" data-engine="openai" hidden>
-          <label class="field">
-            <span class="field-label">TTS 模型</span>
-            <input type="text" id="setOpenaiTtsModel" placeholder="tts-1 / gpt-4o-mini-tts" />
-          </label>
-          <label class="field">
-            <span class="field-label">音色</span>
-            <input type="text" id="setOpenaiTtsVoice" placeholder="alloy / nova / ..." />
-          </label>
-          <p class="field-tip">使用上方「AI 接口」里的 Base URL 与 Key，调用 /audio/speech。</p>
-        </div>
-        <div class="field-row">
-          <label class="field">
-            <span class="field-label">语速</span>
-            <input type="range" id="setTtsRate" min="0.5" max="2" step="0.05" />
-            <output id="outTtsRate"></output>
-          </label>
-          <label class="field">
-            <span class="field-label">音调</span>
-            <input type="range" id="setTtsPitch" min="0.5" max="2" step="0.05" />
-            <output id="outTtsPitch"></output>
-          </label>
-        </div>
-        <label class="field">
-          <span class="field-label">音量</span>
-          <input type="range" id="setTtsVolume" min="0" max="1" step="0.05" />
-          <output id="outTtsVolume"></output>
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setLipSync" />
-          <span>口型同步（说话时嘴部随声音张开）</span>
-        </label>
-      </section>
-
-      <!-- 形象 -->
       <section class="tab-page" data-page="model" hidden>
+        <div class="model-cards" id="modelCards"></div>
+        <p class="field-tip">切换模型后，会同时切换她的人设与记忆（各自独立保存）。</p>
         <label class="field">
-          <span class="field-label">缩放</span>
-          <input type="range" id="setModelScale" min="0.3" max="2.5" step="0.02" />
-          <output id="outModelScale"></output>
+          <span class="field-label">缩放微调</span>
+          <input type="range" id="setModelScale" min="0.5" max="1.6" step="0.02" /><output id="outModelScale"></output>
         </label>
         <div class="field-row">
-          <label class="field">
-            <span class="field-label">水平位置</span>
-            <input type="range" id="setModelX" min="-1" max="1" step="0.02" />
-            <output id="outModelX"></output>
-          </label>
-          <label class="field">
-            <span class="field-label">垂直位置</span>
-            <input type="range" id="setModelY" min="-1" max="1" step="0.02" />
-            <output id="outModelY"></output>
-          </label>
+          <label class="field"><span class="field-label">水平位置</span>
+            <input type="range" id="setModelX" min="-1" max="1" step="0.02" /><output id="outModelX"></output></label>
+          <label class="field"><span class="field-label">垂直位置</span>
+            <input type="range" id="setModelY" min="-1" max="1" step="0.02" /><output id="outModelY"></output></label>
         </div>
-        <label class="field">
-          <span class="field-label">不透明度</span>
-          <input type="range" id="setModelOpacity" min="0.2" max="1" step="0.02" />
-          <output id="outModelOpacity"></output>
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setGaze" />
-          <span>视线跟随鼠标</span>
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setIdleMotion" />
-          <span>待机小动作（呼吸、东张西望）</span>
-        </label>
-        <label class="field">
-          <span class="field-label">张口幅度</span>
-          <input type="range" id="setMouthScale" min="0.2" max="2" step="0.05" />
-          <output id="outMouthScale"></output>
-        </label>
+        <label class="field"><span class="field-label">不透明度</span>
+          <input type="range" id="setModelOpacity" min="0.2" max="1" step="0.02" /><output id="outModelOpacity"></output></label>
+        <label class="field-switch"><input type="checkbox" id="setGaze" /><span>视线跟随鼠标</span></label>
+        <label class="field-switch"><input type="checkbox" id="setIdleMotion" /><span>待机小动作（呼吸、张望）</span></label>
+        <label class="field"><span class="field-label">张口幅度</span>
+          <input type="range" id="setMouthScale" min="0.2" max="2" step="0.05" /><output id="outMouthScale"></output></label>
         <div class="field-actions">
           <button class="btn ghost" id="btnResetModel">重置形象</button>
           <button class="btn" id="btnTestMotion">测试动作</button>
         </div>
       </section>
 
-      <!-- 界面 -->
-      <section class="tab-page" data-page="ui" hidden>
-        <label class="field">
-          <span class="field-label">主题</span>
-          <select id="setTheme">
-            <option value="auto">跟随系统</option>
-            <option value="light">浅色</option>
-            <option value="dark">深色</option>
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">她的名字</span>
-          <input type="text" id="setTitle" />
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setQuickChips" />
-          <span>显示快捷提问</span>
-        </label>
-        <label class="field-switch">
-          <input type="checkbox" id="setClickReact" />
-          <span>点击角色触发互动动作</span>
-        </label>
-        <label class="field">
-          <span class="field-label">对话记忆轮数（同上）</span>
-          <input type="range" id="setHistory2" min="0" max="30" step="1" />
-          <output id="outHistory2"></output>
-        </label>
+      <section class="tab-page" data-page="api">
+        <label class="field"><span class="field-label">接口地址 Base URL</span>
+          <input type="text" id="setBaseUrl" placeholder="https://your-api.com/v1" autocomplete="off" spellcheck="false" /></label>
+        <label class="field"><span class="field-label">API Key</span>
+          <input type="password" id="setApiKey" placeholder="sk-..." autocomplete="off" spellcheck="false" /></label>
+        <label class="field"><span class="field-label">模型名称 Model</span>
+          <input type="text" id="setModel" placeholder="gpt-4o-mini / glm-4-flash / ..." autocomplete="off" spellcheck="false" /></label>
+        <div class="field-row">
+          <label class="field"><span class="field-label">温度</span>
+            <input type="range" id="setTemp" min="0" max="1.5" step="0.05" /><output id="outTemp"></output></label>
+          <label class="field"><span class="field-label">最大回复长度</span>
+            <input type="range" id="setMaxTokens" min="0" max="4096" step="64" /><output id="outMaxTokens"></output></label>
+        </div>
+        <label class="field-switch"><input type="checkbox" id="setStream" /><span>流式输出（更快，但不会逐字打出来）</span></label>
+        <label class="field-switch"><input type="checkbox" id="setReasoning" /><span>在思考气泡里显示模型的推理过程</span></label>
+        <label class="field-switch"><input type="checkbox" id="setAutoTags" /><span>自动附加「身体/动作控制」说明（让 AI 驱动动作）</span></label>
         <div class="field-actions">
-          <button class="btn ghost" id="btnClearHistory">清空对话记录</button>
+          <button class="btn" id="btnTestApi">测试连接</button>
+          <span class="test-result" id="apiTestResult"></span>
+        </div>
+      </section>
+
+      <section class="tab-page" data-page="persona" hidden>
+        <label class="field"><span class="field-label">系统提示词（当前模型的人设）</span>
+          <textarea id="setPersona" rows="8" class="mono"></textarea></label>
+        <p class="field-tip" id="personaTip">这是她的「人格」。修改后立即生效，并按当前模型独立保存。</p>
+        <button class="btn ghost" id="btnResetPersona">恢复该模型默认人设</button>
+      </section>
+
+      <section class="tab-page" data-page="memory" hidden>
+        <div class="mem-stat">
+          <div><span class="mem-num" id="memTokens">0</span><span class="mem-unit">估算 tokens</span></div>
+          <div class="mem-bar"><i id="memBar"></i></div>
+          <div class="mem-sub" id="memSub">窗口 8000 · 最近 6 轮原文</div>
+        </div>
+        <label class="field"><span class="field-label">上下文窗口（估算 token，达到即自动压缩）</span>
+          <input type="range" id="setCtxWindow" min="2000" max="32000" step="500" /><output id="outCtxWindow"></output></label>
+        <label class="field"><span class="field-label">压缩时保留的最近轮数</span>
+          <input type="range" id="setKeepRecent" min="2" max="16" step="1" /><output id="outKeepRecent"></output></label>
+        <label class="field"><span class="field-label">长期记忆摘要（可编辑）</span>
+          <textarea id="setSummary" rows="6" class="mono" placeholder="（还没有摘要，聊天变长后会自动生成）"></textarea></label>
+        <div class="field-actions">
+          <button class="btn" id="btnCompact">立即压缩</button>
+          <button class="btn ghost danger" id="btnClearMem">清空记忆</button>
+        </div>
+      </section>
+
+      <section class="tab-page" data-page="tts" hidden>
+        <label class="field-switch"><input type="checkbox" id="setTtsEnabled" /><span>开启语音（她开口说话）</span></label>
+        <label class="field"><span class="field-label">语音引擎</span>
+          <select id="setTtsEngine">
+            <option value="edge">微软 Edge TTS（免费·尝试优先）</option>
+            <option value="webspeech">浏览器内置语音（稳定·推荐）</option>
+            <option value="openai">OpenAI 兼容 /audio/speech</option>
+          </select></label>
+        <div class="tts-engine-block" data-engine="edge">
+          <label class="field"><span class="field-label">音色</span><select id="setEdgeVoice"></select></label>
+          <p class="field-tip">微软该接口近期常被限制，连不上时会自动改用浏览器内置语音（在 Edge/Windows 上用的是同一批微软神经音色）。</p>
+        </div>
+        <div class="tts-engine-block" data-engine="webspeech" hidden>
+          <label class="field"><span class="field-label">系统音色</span><select id="setWebSpeechVoice"></select></label>
+          <p class="field-tip">浏览器内置语音离线可用；会自动挑选系统里最好的中文神经音色。</p>
+        </div>
+        <div class="tts-engine-block" data-engine="openai" hidden>
+          <label class="field"><span class="field-label">TTS 模型</span><input type="text" id="setOpenaiTtsModel" placeholder="tts-1 / gpt-4o-mini-tts" /></label>
+          <label class="field"><span class="field-label">音色</span><input type="text" id="setOpenaiTtsVoice" placeholder="alloy / nova" /></label>
+          <p class="field-tip">使用「AI 接口」里的 Base URL 与 Key。</p>
+        </div>
+        <div class="field-row">
+          <label class="field"><span class="field-label">语速</span><input type="range" id="setTtsRate" min="0.5" max="2" step="0.05" /><output id="outTtsRate"></output></label>
+          <label class="field"><span class="field-label">音调</span><input type="range" id="setTtsPitch" min="0.5" max="2" step="0.05" /><output id="outTtsPitch"></output></label>
+        </div>
+        <label class="field"><span class="field-label">音量</span><input type="range" id="setTtsVolume" min="0" max="1" step="0.05" /><output id="outTtsVolume"></output></label>
+        <label class="field-switch"><input type="checkbox" id="setLipSync" /><span>口型同步</span></label>
+      </section>
+
+      <section class="tab-page" data-page="ui" hidden>
+        <label class="field"><span class="field-label">主题</span>
+          <select id="setTheme"><option value="auto">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+        <label class="field"><span class="field-label">消息区闲置后自动隐藏（秒，0=不隐藏）</span>
+          <input type="range" id="setFeedAutoHide" min="0" max="30" step="1" /><output id="outFeedAutoHide"></output></label>
+        <label class="field-switch"><input type="checkbox" id="setClickReact" /><span>点击角色触发互动动作</span></label>
+        <div class="field-actions">
           <button class="btn ghost danger" id="btnResetAll">恢复全部默认</button>
         </div>
       </section>
 
-      <!-- 关于 -->
       <section class="tab-page" data-page="about" hidden>
         <div class="about-card">
-          <h3>安An · AI Live2D 伙伴</h3>
-          <p>一个纯前端的 Live2D 智能伙伴。上半部分是她的身体，下半部分是你的交流窗口。她由你提供的 OpenAI 兼容大模型驱动，用气泡回话、思考，并用全身表情与动作回应你。</p>
+          <h3>安An / 薇儿 · AI 伙伴</h3>
+          <p>纯前端的 Live2D 智能伙伴：上半部分是她的身体，下半部分是你的交流窗口。她由你提供的 OpenAI 兼容大模型驱动，用气泡回话与思考，并用全身的表情与动作回应你。</p>
         </div>
         <div class="about-card">
-          <h4>技术</h4>
-          <p>PixiJS + pixi-live2d-display（Cubism 4）渲染；自研动作引擎驱动 30+ 个模型参数与 18 个内置表情；支持微软 Edge TTS / 浏览器语音 / OpenAI 兼容 TTS。</p>
+          <h4>她能动什么？</h4>
+          <p>动到什么程度，取决于模型本身的"绑定"（有哪些参数、范围多大）；而"怎么动"由程序与 AI 决定。本项目用自研动作引擎实时驱动头部/身体/眼睛/眉毛/嘴/脸颊/手臂等参数，并把动作控制权交给 AI。</p>
         </div>
         <div class="about-card">
           <h4>模型版权</h4>
-          <p>本模型为《魔法少女的魔女审判》二次创作同人模型，由 B 站 <b>@万童Official</b>、<b>@断夏Official</b> 联合出品，完全免费分享。请勿用于付费用途。感谢原作者！</p>
+          <p>「安An」为《魔法少女的魔女审判》二次创作同人模型（B 站 @万童Official / @断夏Official 出品，完全免费）。请勿用于商业用途，感谢原作者！</p>
         </div>
-        <div class="field-actions">
-          <a class="btn ghost" href="https://yamawamandou.booth.pm/" target="_blank" rel="noopener">作者 BOOTH 主页</a>
-        </div>
+        <div class="field-actions"><a class="btn ghost" href="https://yamawamandou.booth.pm/" target="_blank" rel="noopener">作者 BOOTH 主页</a></div>
       </section>
     </div>
   </div>
 </div>
 
-<!-- 依赖库 + 应用 -->
 <script src="assets/js/lib/pixi.min.js"></script>
 <script src="assets/js/lib/live2dcubismcore.min.js"></script>
 <script src="assets/js/lib/cubism4.min.js"></script>
 <script src="assets/js/config.js"></script>
+<script src="assets/js/memory.js"></script>
 <script src="assets/js/motion.js"></script>
 <script src="assets/js/tts.js"></script>
 <script src="assets/js/llm.js"></script>

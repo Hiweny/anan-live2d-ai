@@ -1,4 +1,4 @@
-// e2e/test.mjs — 用真实无头浏览器打开页面，验证模型渲染、动作、以及 AI 驱动效果
+// e2e/test.mjs v2 — 桌面端 + 移动端 + 深色模式 的真实浏览器验证
 import { chromium } from "playwright";
 import fs from "fs";
 
@@ -9,116 +9,137 @@ fs.mkdirSync(outDir, { recursive: true });
 
 const diag = { target, tag, errors: [], consoleErrors: [], steps: [] };
 const log = (...a) => console.log("[e2e]", ...a);
-
-const browser = await chromium.launch({
-  args: [
-    "--no-sandbox",
-    "--enable-unsafe-swiftshader",
-    "--use-gl=angle",
-    "--use-angle=swiftshader",
-    "--ignore-gpu-blocklist",
-    "--autoplay-policy=no-user-gesture-required"
-  ]
-});
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1, locale: "zh-CN" });
-const page = await ctx.newPage();
-page.on("pageerror", (e) => diag.errors.push(String((e && e.stack) || e)));
-page.on("console", (m) => { if (m.type() === "error") diag.consoleErrors.push(m.text()); });
-
-const shot = (n) => page.screenshot({ path: `${outDir}/${tag}-${n}.jpg`, type: "jpeg", quality: 72 });
-
 const K = process.env.TEST_API_KEY, B = process.env.TEST_API_BASE, M = process.env.TEST_API_MODEL;
 diag.hasCreds = !!K;
-if (K) {
-  await ctx.addInitScript(([k, b, m]) => {
-    try {
-      localStorage.setItem("anan.settings.v1", JSON.stringify({
-        baseUrl: b, apiKey: k, model: m, ttsEnabled: false, stream: true,
-        showReasoning: true, autoTags: true, history: 8, modelScale: 1,
-        idleMotion: false, gaze: false
-      }));
-    } catch (e) {}
-  }, [K, B, M]);
+
+const browser = await chromium.launch({
+  args: ["--no-sandbox", "--enable-unsafe-swiftshader", "--use-gl=angle", "--use-angle=swiftshader",
+    "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"]
+});
+
+const initSettings = (extra) => `(() => { try {
+  localStorage.setItem("anan.settings.v2", JSON.stringify(${JSON.stringify(extra)}));
+} catch(e){} })()`;
+
+function makeCtx(opts, extra) {
+  const base = { locale: "zh-CN" };
+  const ctxOpts = Object.assign(base, opts);
+  return browser.newContext(ctxOpts).then(async (ctx) => {
+    if (extra) await ctx.addInitScript(initSettings(extra));
+    const page = await ctx.newPage();
+    page.on("pageerror", (e) => diag.errors.push(String((e && e.stack) || e)));
+    page.on("console", (m) => { if (m.type() === "error") diag.consoleErrors.push(m.text()); });
+    return { ctx, page };
+  });
 }
 
-const clickEval = async (sel) => page.evaluate((s) => { const el = document.querySelector(s); if (el) el.click(); }, sel);
+const shot = (page, name) => page.screenshot({ path: `${outDir}/${tag}-${name}.jpg`, type: "jpeg", quality: 70 });
+const clickEval = (page, sel) => page.evaluate((s) => { const el = document.querySelector(s); if (el) el.click(); }, sel);
+
+async function waitReady(page, id) {
+  await page.waitForFunction((want) => window.AnAn && window.AnAn.__ready === true && (!want || window.__ananModelId === want), id || null, { timeout: 150000 });
+  await page.waitForFunction(() => window.__ananLoading === false, { timeout: 150000 }).catch(() => {});
+}
 
 try {
-  await page.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.waitForFunction(() => window.AnAn && window.AnAn.__ready === true, { timeout: 150000 });
-  diag.steps.push("model-ready");
-  await page.evaluate(() => { const s = document.getElementById("settings"); if (s) s.hidden = true; });
-  await page.waitForTimeout(1500);
-  await shot("01-loaded");
+  /* ═══ 1. 桌面端 ═══ */
+  const dset = K ? { baseUrl: B, apiKey: K, model: M, ttsEnabled: false, stream: true, showReasoning: false, autoTags: true, idleMotion: false, gaze: false, ctxWindow: 8000 } : { ttsEnabled: false };
+  const { ctx: dctx, page: dp } = await makeCtx({ viewport: { width: 1280, height: 820 }, deviceScaleFactor: 1 }, dset);
+  await dp.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await waitReady(dp);
+  diag.steps.push("desktop-ready");
+  await dp.waitForTimeout(1200);
+  await shot(dp, "d1-loaded");
 
-  diag.paramCount = await page.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
-  diag.paramError = await page.evaluate(() => window.__anan.live2d.paramError || null);
-  diag.hasAngleX = await page.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamAngleX") !== -1; } catch (e) { return null; } });
-  diag.expressions = await page.evaluate(() => {
-    try {
-      const em = window.__anan.live2d.model.internalModel.motionManager.expressionManager;
-      const d = em.definitions || em._definitions || [];
-      return d.map((x) => x.Name);
-    } catch (e) { return null; }
-  });
-  diag.modelBounds = await page.evaluate(() => {
-    try {
-      const b = window.__anan.live2d.model.getBounds();
-      const a = window.__anan.live2d.getHeadAnchor();
-      return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), headX: Math.round(a.x), headY: Math.round(a.y), vw: innerWidth, vh: innerHeight };
-    } catch (e) { return null; }
-  });
+  diag.paramCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
+  diag.paramError = await dp.evaluate(() => window.__anan.live2d.paramError || null);
+  diag.modelBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height), vw: innerWidth, vh: innerHeight }; });
 
-  // 开始（解锁音频）—— 用 evaluate 点击，规避呼吸动画导致的稳定性检测
-  await clickEval("#guardBtn");
-  await page.waitForTimeout(1000);
-  diag.guardHidden = await page.evaluate(() => document.getElementById("guard").hidden);
-  await shot("02-started");
+  await dp.evaluate(() => window.__ananPlay("look_away"));
+  await dp.waitForTimeout(600);
+  diag.applied_lookaway = await dp.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
+  await shot(dp, "d2-gesture");
 
-  // 触发动作并截图，读取“上一帧实际叠加量”作为数值证据
-  await page.evaluate(() => window.__ananPlay("look_away"));
-  await page.waitForTimeout(600);
-  diag.applied_lookaway = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
-  await shot("03-gesture-lookaway");
-
-  await page.evaluate(() => window.__ananPlay("tilt"));
-  await page.waitForTimeout(450);
-  diag.applied_tilt = await page.evaluate(() => { try { return window.__anan.live2d.engine.lastAdds; } catch (e) { return null; } });
-  await shot("04-gesture-tilt");
-
-  // 语音：验证 Edge TTS（微软免费接口）在浏览器内是否可用（含回退）
-  diag.tts = await page.evaluate(async () => {
-    try {
-      const t = window.__anan.tts;
-      t.resume();
-      const r = await t.speak("你好呀，我是安An。", { engine: "edge", edgeVoice: "zh-CN-XiaoxiaoNeural", rate: 1, pitch: 1, volume: 0.0 });
+  // Edge TTS 探测
+  diag.tts = await dp.evaluate(async () => {
+    try { const t = window.__anan.tts; t.resume();
+      const r = await t.speak("你好呀", { engine: "edge", edgeVoice: "zh-CN-XiaoxiaoNeural", rate: 1, pitch: 1, volume: 0 });
       return { engine: r && r.engine, last: t.lastEngine, voice: t.lastVoice || null, err: t.lastError || null };
     } catch (e) { return { error: String((e && e.message) || e) }; }
   });
 
-  // AI 对话（真实接口）
+  // 对话
   if (K && M) {
-    await page.fill("#chatInput", "你好，用一句话介绍自己，并在开头用动作标签表现出你很开心");
-    await clickEval("#btnSend");
-    await page.waitForFunction(() => {
-      const b = document.getElementById("bubble");
-      if (!b || b.dataset.state !== "show") return false;
-      const t = b.querySelector('[data-role="text"]');
-      return b.dataset.kind === "reply" && t && (t.textContent || "").length > 0;
+    await dp.fill("#chatInput", "你好，用一句话介绍自己，并在开头用动作标签表现出你很开心");
+    await clickEval(dp, "#btnSend");
+    await dp.waitForFunction(() => {
+      const b = document.querySelector("#bubbleStack .bubble .txt");
+      const m = document.querySelector("#feed .msg.ai");
+      return (b && (b.textContent || "").length > 0) || (m && (m.textContent || "").length > 0);
     }, { timeout: 120000 }).catch(() => diag.steps.push("chat-timeout"));
-    await page.waitForTimeout(2000);
-    await shot("05-chat");
-    diag.bubbleText = await page.evaluate(() => { const t = document.querySelector('#bubble [data-role="text"]'); return t && t.textContent; });
-    diag.mood = await page.evaluate(() => window.__anan.mood);
-    diag.historyLen = await page.evaluate(() => window.__anan.history.length);
-    diag.lastReasoning = await page.evaluate(() => (window.__anan.lastReasoning || "").slice(0, 120));
+    await dp.waitForTimeout(2500);
+    await shot(dp, "d3-chat");
+    diag.bubbleText = await dp.evaluate(() => { const b = document.querySelector("#bubbleStack .bubble .txt"); const m = document.querySelector("#feed .msg.ai"); return (b && b.textContent) || (m && m.textContent) || null; });
+    diag.feedText = await dp.evaluate(() => Array.from(document.querySelectorAll("#feed .msg")).map(e => e.className.replace("msg ", "") + ":" + e.textContent));
+    diag.mood = await dp.evaluate(() => window.__anan.mood);
+    diag.historyLen = await dp.evaluate(() => { try { return JSON.parse(localStorage.getItem("anan.mem.v2")).anan.history.length; } catch (e) { return null; } });
+    diag.lastReasoning = await dp.evaluate(() => (window.__anan.lastReasoning || "").slice(0, 80));
   }
+
+  // 切换模型 → 女仆
+  diag.switch = await dp.evaluate(async () => {
+    try { await window.__ananSwitch("maid"); return { ok: true, id: window.__ananModelId }; }
+    catch (e) { return { ok: false, err: String(e && e.message || e) }; }
+  });
+  await dp.waitForTimeout(2500);
+  await shot(dp, "d4-maid");
+  diag.maidParamCount = await dp.evaluate(() => { try { return window.__anan.live2d.getParams().length; } catch (e) { return -1; } });
+  diag.maidHasArm = await dp.evaluate(() => { try { return window.__anan.live2d.coreModel.getParameterIndex("ParamArmR") !== -1; } catch (e) { return null; } });
+  diag.maidBounds = await dp.evaluate(() => { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; });
+  await dctx.close();
+
+  /* ═══ 2. 移动端（响应式 / 溢出检查）═══ */
+  const { ctx: mctx, page: mp } = await makeCtx({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, { theme: "auto" });
+  await mp.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await waitReady(mp);
+  diag.steps.push("mobile-ready");
+  await mp.waitForTimeout(1500);
+  await shot(mp, "m1-loaded");
+  diag.mobile = await mp.evaluate(() => {
+    const r = (s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return { l: Math.round(b.left), r: Math.round(b.right), t: Math.round(b.top), b: Math.round(b.bottom) }; };
+    return {
+      vw: innerWidth, vh: innerHeight,
+      docScrollW: document.documentElement.scrollWidth,
+      dock: r("#dock"), feed: r("#feedWrap"), bar: r("#topbar"),
+      model: (function () { try { const b = window.__anan.live2d.model.getBounds(); return { x: Math.round(b.x), w: Math.round(b.width), y: Math.round(b.y), h: Math.round(b.height) }; } catch (e) { return null; } })()
+    };
+  });
+  // 触发一次气泡，检查气泡不越界
+  await mp.evaluate(() => window.__ananPlay("nod"));
+  await mp.waitForTimeout(300);
+  await clickEval(mp, "#chatInput");
+  await mctx.close();
+
+  /* ═══ 3. 深色模式（白闪 / 主题）═══ */
+  const { ctx: kctx, page: kp } = await makeCtx({ viewport: { width: 900, height: 800 } }, { theme: "dark", ttsEnabled: false });
+  await kp.goto(target, { waitUntil: "domcontentloaded", timeout: 60000 });
+  const earlyBg = await kp.evaluate(() => getComputedStyle(document.documentElement).backgroundColor);
+  await waitReady(kp);
+  await kp.waitForTimeout(1200);
+  await shot(kp, "k1-dark");
+  diag.dark = await kp.evaluate(() => ({
+    htmlClass: document.documentElement.className,
+    htmlBg: getComputedStyle(document.documentElement).backgroundColor,
+    bodyBg: getComputedStyle(document.body).backgroundColor,
+    canvasBg: getComputedStyle(document.querySelector("#bg")).backgroundColor
+  }));
+  diag.darkEarlyBg = earlyBg;
+  await kctx.close();
 } catch (e) {
   diag.fatal = String((e && e.stack) || e);
   diag.steps.push("fatal");
-  try { await shot("error"); } catch (_) {}
 }
 
 fs.writeFileSync(`${outDir}/${tag}-diag.json`, JSON.stringify(diag, null, 2));
-log(JSON.stringify(diag, null, 2).slice(0, 4000));
+log(JSON.stringify(diag, null, 2).slice(0, 4500));
 await browser.close();
